@@ -104,6 +104,7 @@ app ever moves to another address, change those links in `docs/email-templates/i
 | Symptom | Fix |
 |---|---|
 | "Almost there: connect Supabase" page | The two `NEXT_PUBLIC_SUPABASE_*` variables are missing or still placeholders. Add them and redeploy. |
+| Invitation link opens a `vercel.com/...` page that says **404** | The Supabase **Site URL** was set to the Vercel *dashboard* address. Set it to `https://elevate-campus-hub.vercel.app` (Authentication → URL Configuration), and paste the current `invite.html` / `recovery.html` into Supabase (they carry the real address themselves). Old emails keep their old link: send a new invitation. |
 | Invitation button opens `localhost` | Three things decide the address, all must be the Vercel URL: (1) Supabase → Authentication → URL Configuration → **Site URL** (the email button is built from it), (2) `NEXT_PUBLIC_SITE_URL` in **Vercel** (if it is missing the app uses the address the request came in on), (3) send the invitation **from the deployed site**, not from `npm run dev`: a local app uses your local `.env.local`. Hover the email button to see where it points; old emails keep their old address, so send a new invitation. |
 | Invitation link says it expired / redirects to login | Add the Vercel address to Supabase **Redirect URLs**; links are single-use. |
 | Sign-in loops or logs you out | Check the `SUPABASE_SERVICE_ROLE_KEY` and that the Site URL is `https`. |
