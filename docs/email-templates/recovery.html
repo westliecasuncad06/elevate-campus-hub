@@ -4,9 +4,14 @@
   Body:     paste everything from the doctype line down (the HTML, not this comment).
   (Or run `npm run supabase:email-templates` to apply both templates for you.)
 
-  Used when someone already opened their invitation but never chose a password (Campus Head > Students >
-  Resend invitation), and for any other "set a new password" email. Same landing page and look as the invitation.
-  Images are served by the app ({{ .SiteURL }}/brand/...), so the Supabase "Site URL" must be the deployed address.
+  Used when someone already opened their invitation but never chose a password (Resend invitation), and for any other
+  "set a new password" email. Same look as the invitation.
+
+  NO IMAGES: the logo and tagline are plain HTML text, so nothing can show up as a broken picture.
+
+  THE APP'S ADDRESS is written out in the links below (https://elevate-campus-hub.vercel.app) instead of using
+  {{ .SiteURL }}, so they work even if Supabase's "Site URL" is wrong. If the app ever moves to another address, change
+  them (search for elevate-campus-hub.vercel.app).
 -->
 <!doctype html>
 <html lang="en">
@@ -27,9 +32,13 @@
         <td align="center" style="padding:28px 14px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
             <tr>
-              <td bgcolor="#0a0a0a" style="background-color:#0a0a0a;border-radius:14px 14px 0 0;padding:22px 26px 18px 26px;">
-                <img src="{{ .SiteURL }}/brand/email-header.png" width="215" height="63" alt="ELEVATE CAMPUS HUB"
-                     style="display:block;border:0;outline:none;text-decoration:none;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;font-style:italic;letter-spacing:2px;" />
+              <td bgcolor="#0a0a0a" style="background-color:#0a0a0a;border-radius:14px 14px 0 0;padding:24px 28px 20px 28px;">
+                <div style="font-family:'Arial Black',Impact,Arial,Helvetica,sans-serif;font-size:30px;line-height:32px;font-weight:900;font-style:italic;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">
+                  Elevate
+                </div>
+                <div style="margin-top:3px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;font-weight:bold;letter-spacing:5px;color:#c9c9c4;text-transform:uppercase;">
+                  Campus Hub
+                </div>
               </td>
             </tr>
             <tr>
@@ -51,7 +60,7 @@
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td align="center" bgcolor="#d93a1e" style="background-color:#d93a1e;border-radius:8px;">
-                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery"
+                      <a href="https://elevate-campus-hub.vercel.app/auth/confirm?token_hash={{ .TokenHash }}&type=recovery"
                          style="display:inline-block;padding:15px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">
                         Choose my password
                       </a>
@@ -66,20 +75,19 @@
             </tr>
 
             <tr>
-              <td bgcolor="#0a0a0a" align="center" style="background-color:#0a0a0a;border-radius:0 0 14px 14px;padding:6px 10px;">
-                <img src="{{ .SiteURL }}/brand/email-tagline.png" width="440" height="43" alt="CHANGE THE CAMPUS ONE STUDENT AT A TIME."
-                     style="display:block;margin:0 auto;border:0;max-width:100%;height:auto;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;font-style:italic;letter-spacing:2px;" />
+              <td bgcolor="#0a0a0a" align="center" style="background-color:#0a0a0a;border-radius:0 0 14px 14px;padding:15px 12px;font-family:'Arial Black',Impact,Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;font-weight:bold;font-style:italic;letter-spacing:2px;color:#ffffff;text-transform:uppercase;">
+                Change the campus one student at a time.
               </td>
             </tr>
 
             <tr>
               <td style="padding:20px 8px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5a5a56;">
                 Button not working? Copy this address into your browser:<br />
-                <span style="word-break:break-all;color:#d93a1e;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery</span>
+                <span style="word-break:break-all;color:#d93a1e;">https://elevate-campus-hub.vercel.app/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery</span>
                 <br /><br />
                 Didn't ask for this? You can safely ignore this email. Nothing changes unless you open the link.
                 <br />
-                <a href="{{ .SiteURL }}/privacy" style="color:#5a5a56;">Data Privacy Notice</a>
+                <a href="https://elevate-campus-hub.vercel.app/privacy" style="color:#5a5a56;">Data Privacy Notice</a>
               </td>
             </tr>
           </table>

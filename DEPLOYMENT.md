@@ -46,7 +46,9 @@ Generate a `CRON_SECRET` in PowerShell:
 
 Supabase → **Authentication → URL Configuration**:
 
-- **Site URL**: `https://<project-name>.vercel.app` (the email templates build their button from this).
+- **Site URL**: `https://<project-name>.vercel.app`, the address people type to open the app (for this project:
+  `https://elevate-campus-hub.vercel.app`). **Not** the `vercel.com/<team>/<project>` link you see inside the Vercel dashboard:
+  that is a different page and gives a 404 for everyone else.
 - **Redirect URLs**: add `https://<project-name>.vercel.app/**` and keep `http://localhost:3000/**` for local work.
 
 While testing, invitation emails always point at the **Site URL**. Switch it back to `http://localhost:3000` only if you
@@ -69,9 +71,11 @@ pasting the new `invite.html`, also set **Authentication → Providers → Email
 to 8) and choose a longer **Email OTP Expiration** (for example 24 hours), otherwise the code stops working after an hour.
 Re-sending the invitation always makes a fresh code.
 
-The logo and tagline in the email are images from this website (`/brand/email-header.png`, `/brand/email-tagline.png`), so the
-site must be deployed and the Supabase **Site URL** must be its address. If a mail app blocks images the alt text still reads
-"Elevate Campus Hub".
+**The emails contain no images** (the "ELEVATE CAMPUS HUB" name and the tagline are plain HTML text), so there is nothing to show up
+broken, and an email app that blocks pictures still looks right. Their links point straight at
+`https://elevate-campus-hub.vercel.app`, written into the templates, so they work even if Supabase's Site URL is wrong. If the
+app ever moves to another address, change those links in `docs/email-templates/invite.html` and `recovery.html` (search for
+`elevate-campus-hub.vercel.app`) and paste the templates into Supabase again.
 
 ## 4. Check it works
 

@@ -224,10 +224,12 @@ In Supabase **Authentication**:
    - **Reset password** → subject `Choose your Elevate Campus Hub password`, body = [recovery.html](docs/email-templates/recovery.html)
      (used when someone opened their invitation but never chose a password, and Campus Head presses *Resend invitation*)
 
-   Paste everything from `<!doctype html>` down. Both buttons go to this app's `/auth/confirm` page, which signs the
-   person in and shows "Choose your password". The app also copes with Supabase's default template (the link's
-   sign-in token is read in the browser by `/auth/finish`), so a missed template never blocks someone from signing up.
-   The Site URL from step 1 must be correct, because the buttons are built from it.
+   Paste everything from `<!doctype html>` down. The invitation shows a **registration code** and a **Register** button (the
+   person types the code at `/register`); the password email's button goes to `/auth/confirm`, which signs the person in. The
+   emails have **no images** and link straight to `https://elevate-campus-hub.vercel.app` (written into the templates; change
+   it there if the app moves). The app also copes with Supabase's default template (the link's sign-in token is read in the
+   browser by `/auth/finish`), so a missed template never blocks someone from signing up. Still set the **Site URL** in step 1
+   correctly (once deployed: the address people type, never the `vercel.com/...` dashboard link).
 
 4. **Sign In / Providers → Email → Email OTP Expiration** → set it to the maximum (`86400` seconds = 24 hours).
    Invitation links expire after 1 hour by default, which is too short for students who check email later.

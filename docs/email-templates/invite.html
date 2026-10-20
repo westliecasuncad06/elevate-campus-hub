@@ -4,15 +4,18 @@
   Body:     paste everything from the doctype line down (the HTML, not this comment).
   (Or run `npm run supabase:email-templates` to apply both templates for you.)
 
-  The email carries a REGISTRATION CODE ({{ .Token }}). The person opens {{ .SiteURL }}/register (the button, with their email
-  already filled in), types the code, then completes their registration (name, details, password). The code is Supabase's
+  The email carries a REGISTRATION CODE ({{ .Token }}). The person opens the Register button (their email is already
+  filled in), types the code, then completes their registration (name, details, password). The code is Supabase's
   email OTP: set "Email OTP Length" to 6 (and choose how long it stays valid) under Authentication > Providers > Email.
-  The one-time link ({{ .TokenHash }}) is kept as a backup and lands on /auth/confirm, which signs the person in and sends
-  them to the same "Complete your registration" page.
+  The one-time link ({{ .TokenHash }}) is a backup: it signs the person in and sends them to the same registration page.
 
-  The logo and tagline are images served by the app itself ({{ .SiteURL }}/brand/...), rendered from the same
-  font and mark as the website, so the Supabase "Site URL" must be the deployed address. If an email app blocks images, the
-  alt text still reads "Elevate Campus Hub".
+  NO IMAGES: the logo and tagline are plain HTML text, so nothing can show up as a broken picture, and an email app that
+  blocks images still looks right.
+
+  THE APP'S ADDRESS is written out in the three links below (https://elevate-campus-hub.vercel.app) instead of using
+  {{ .SiteURL }}, so they work even if Supabase's "Site URL" is wrong. If the app ever moves to another address, change
+  those three links (search for elevate-campus-hub.vercel.app).
+
   Colours: black #0A0A0A, white, Elevate red #ED482D (button #D93A1E so the white text stays readable).
 -->
 <!doctype html>
@@ -34,11 +37,15 @@
       <tr>
         <td align="center" style="padding:28px 14px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
-            <!-- Black band with the app's logo lockup, and a red edge -->
+            <!-- Black band with the name, and a red edge -->
             <tr>
-              <td bgcolor="#0a0a0a" style="background-color:#0a0a0a;border-radius:14px 14px 0 0;padding:22px 26px 18px 26px;">
-                <img src="{{ .SiteURL }}/brand/email-header.png" width="215" height="63" alt="ELEVATE CAMPUS HUB"
-                     style="display:block;border:0;outline:none;text-decoration:none;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;font-style:italic;letter-spacing:2px;" />
+              <td bgcolor="#0a0a0a" style="background-color:#0a0a0a;border-radius:14px 14px 0 0;padding:24px 28px 20px 28px;">
+                <div style="font-family:'Arial Black',Impact,Arial,Helvetica,sans-serif;font-size:30px;line-height:32px;font-weight:900;font-style:italic;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">
+                  Elevate
+                </div>
+                <div style="margin-top:3px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;font-weight:bold;letter-spacing:5px;color:#c9c9c4;text-transform:uppercase;">
+                  Campus Hub
+                </div>
               </td>
             </tr>
             <tr>
@@ -56,7 +63,7 @@
                   with every conversation. Register with the code below. It only takes a minute.
                 </p>
 
-                <!-- The 6-digit registration code -->
+                <!-- The registration code -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px 0;">
                   <tr>
                     <td align="center" bgcolor="#f5f5f2" style="background-color:#f5f5f2;border:1px solid #e1e1dc;border-radius:10px;padding:18px 10px 16px 10px;">
@@ -74,7 +81,7 @@
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td align="center" bgcolor="#d93a1e" style="background-color:#d93a1e;border-radius:8px;">
-                      <a href="{{ .SiteURL }}/register?email={{ .Email }}"
+                      <a href="https://elevate-campus-hub.vercel.app/register?email={{ .Email }}"
                          style="display:inline-block;padding:15px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">
                         Register with my code
                       </a>
@@ -88,25 +95,24 @@
               </td>
             </tr>
 
-            <!-- Tagline band (image in the website's display type) -->
+            <!-- Tagline band -->
             <tr>
-              <td bgcolor="#0a0a0a" align="center" style="background-color:#0a0a0a;border-radius:0 0 14px 14px;padding:6px 10px;">
-                <img src="{{ .SiteURL }}/brand/email-tagline.png" width="440" height="43" alt="CHANGE THE CAMPUS ONE STUDENT AT A TIME."
-                     style="display:block;margin:0 auto;border:0;max-width:100%;height:auto;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;font-style:italic;letter-spacing:2px;" />
+              <td bgcolor="#0a0a0a" align="center" style="background-color:#0a0a0a;border-radius:0 0 14px 14px;padding:15px 12px;font-family:'Arial Black',Impact,Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;font-weight:bold;font-style:italic;letter-spacing:2px;color:#ffffff;text-transform:uppercase;">
+                Change the campus one student at a time.
               </td>
             </tr>
 
             <!-- Footer -->
             <tr>
               <td style="padding:20px 8px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5a5a56;">
-                Or go to <span style="color:#d93a1e;">{{ .SiteURL }}/register</span> and type your email and the code.
+                Or go to <span style="color:#d93a1e;">https://elevate-campus-hub.vercel.app/register</span> and type your email and the code.
                 <br /><br />
                 Prefer a link? This one-time link signs you in and takes you straight to registration:<br />
-                <span style="word-break:break-all;color:#d93a1e;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=invite</span>
+                <span style="word-break:break-all;color:#d93a1e;">https://elevate-campus-hub.vercel.app/auth/confirm?token_hash={{ .TokenHash }}&amp;type=invite</span>
                 <br /><br />
                 Didn't expect this email? You can safely ignore it. Nothing happens unless you use the code or the link.
                 <br />
-                <a href="{{ .SiteURL }}/privacy" style="color:#5a5a56;">Data Privacy Notice</a>
+                <a href="https://elevate-campus-hub.vercel.app/privacy" style="color:#5a5a56;">Data Privacy Notice</a>
               </td>
             </tr>
           </table>
