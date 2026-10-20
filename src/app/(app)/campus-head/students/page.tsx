@@ -41,7 +41,8 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
     await Promise.all([
       query,
       supabase.from("facilitator_students").select("student_id, facilitator_id").eq("is_active", true),
-      supabase.from("profiles").select("id, first_name, last_name, gender").eq("role", "facilitator").eq("is_active", true).order("first_name"),
+      // Only facilitators who have registered: until then they have no gender (so no chat) and can't sign in.
+      supabase.from("profiles").select("id, first_name, last_name, gender").eq("role", "facilitator").eq("is_active", true).eq("details_complete", true).order("first_name"),
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })

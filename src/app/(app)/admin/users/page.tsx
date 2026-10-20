@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AccountDialog } from "@/components/accounts/account-dialog";
 import { DeleteUserButton } from "@/components/accounts/delete-user-dialog";
 import { EditUserDialog } from "@/components/accounts/edit-user-dialog";
+import { InviteStaffDialog } from "@/components/accounts/invite-staff-dialog";
 import { ActiveToggleButton, ResendInviteButton, ResetPasswordButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { FormSelect, SubmitButton } from "@/components/forms";
@@ -59,8 +60,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
         description="Everyone with a login, across all campuses."
         actions={
           <>
-            <AccountDialog role="campus_head" campuses={campusOptions} />
-            <AccountDialog role="facilitator" campuses={campusOptions} />
+            <InviteStaffDialog role="campus_head" campuses={campusOptions} />
+            <InviteStaffDialog role="facilitator" campuses={campusOptions} />
             <AccountDialog role="student" programsByCampus={programsByCampus} campuses={campusOptions} />
           </>
         }

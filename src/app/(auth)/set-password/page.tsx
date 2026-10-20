@@ -13,16 +13,22 @@ export default async function SetPasswordPage() {
 
   // First-time setup (or a new notice version) also asks the person to accept the Data Privacy Notice.
   const needsPrivacy = profile.privacy_accepted_version !== PRIVACY_VERSION;
+  // Someone invited by email only tells us who they are here.
+  const needsDetails = !profile.details_complete;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <Brand className="mb-10" />
-        <h1 className="text-3xl font-extrabold tracking-tight">Choose your password</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">
+          {needsDetails ? "Complete your registration" : "Choose your password"}
+        </h1>
         <p className="mt-1.5 mb-6 text-sm text-muted-foreground">
-          Hi {profile.first_name}. You&apos;ll use this password with {profile.email} every time you sign in.
+          {needsDetails
+            ? `Welcome! Tell us about yourself and choose a password. You'll use it with ${profile.email} every time you sign in.`
+            : `Hi ${profile.first_name}. You'll use this password with ${profile.email} every time you sign in.`}
         </p>
-        <SetPasswordForm role={profile.role} needsPrivacy={needsPrivacy} />
+        <SetPasswordForm role={profile.role} needsPrivacy={needsPrivacy} needsDetails={needsDetails} />
       </div>
     </main>
   );

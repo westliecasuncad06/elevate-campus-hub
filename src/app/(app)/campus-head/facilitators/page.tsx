@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AccountDialog } from "@/components/accounts/account-dialog";
+import { InviteStaffDialog } from "@/components/accounts/invite-staff-dialog";
 import { ActiveToggleButton, ResendInviteButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { EmptyState, PageHeader } from "@/components/page-header";
@@ -56,14 +56,14 @@ export default async function FacilitatorsPage() {
       <PageHeader
         title="Facilitators"
         description="Your volunteer team, with their weekly availability."
-        actions={<AccountDialog role="facilitator" />}
+        actions={<InviteStaffDialog role="facilitator" />}
       />
 
       {facilitators.length === 0 ? (
         <EmptyState
           title="No facilitators yet"
-          hint="Add a facilitator and they'll get an email to set their password."
-          action={<AccountDialog role="facilitator" />}
+          hint="Add a facilitator with just their email. They register with the code in the invitation and fill in their own details."
+          action={<InviteStaffDialog role="facilitator" />}
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
@@ -89,7 +89,7 @@ export default async function FacilitatorsPage() {
                     <TableCell>
                       <p className="font-medium">{fullName(f)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {f.gender === "male" ? "Male" : "Female"} · {f.phone ?? f.email}
+                        {f.gender === "male" ? "Male" : f.gender === "female" ? "Female" : "Not registered yet"} · {f.phone ?? f.email}
                       </p>
                       {elsewhere ? (
                         <p className="mt-0.5 text-xs font-medium text-brand-ink">Also works at another campus</p>

@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Sign in" };
 const NOTICES: Record<string, string> = {
   inactive: "Your account was deactivated. Contact your Campus Head or IT.",
   no_profile: "This account no longer exists. Contact your Campus Head or IT if that's a mistake.",
-  invite_expired: "That invitation link has expired or was already used. Ask your Campus Head to resend it.",
+  invite_expired: "That invitation link has expired or was already used. Ask your Campus Head to send a new invitation.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -46,7 +46,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             </p>
           ) : null}
           <LoginForm next={next} />
-          <p className="mt-6 text-sm text-muted-foreground">Forgot your password? Ask IT to reset it for you.</p>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Got an invitation code?{" "}
+            <Link href="/register" className="font-medium text-foreground underline underline-offset-4">
+              Register here
+            </Link>
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Forgot your password? Ask IT to reset it for you.</p>
           <p className="mt-2 text-sm text-muted-foreground">
             <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
               Data Privacy Notice

@@ -536,5 +536,26 @@ console.log("\nFacilitators working at several campuses (migration 0013)");
   check("and so does switching campus yourself", !!m.error && /open batch/.test(m.error), m.error ?? "no error");
 }
 
+console.log("\nEmail-only invitations (migration 0014)");
+{
+  const addProfile = async (key, role, gender, complete) => {
+    const id = randomUUID();
+    await q("insert into auth.users (id, email) values ($1, $2)", [id, `${key}@x.test`]);
+    return tryQ(
+      "insert into public.profiles (id, campus_id, role, first_name, last_name, email, gender, details_complete) values ($1,$2,$3,$4,'',$5,$6,$7)",
+      [id, c1, role, key, `${key}@x.test`, gender, complete],
+    );
+  };
+  check("a facilitator invited by email only can exist before they have a gender", !(await addProfile("pendfac", "facilitator", null, false)).error);
+  check("a Campus Head invited by email only can exist too", !(await addProfile("pendhead", "campus_head", null, false)).error);
+  check("once their details are complete a facilitator must have a gender", !!(await addProfile("donefac", "facilitator", null, true)).error);
+  check("...and so must a student", !!(await addProfile("donestu", "student", null, true)).error);
+  check("details_complete is true unless said otherwise", (await q("select column_default from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'details_complete'"))[0].column_default === "true");
+
+  const pendId = (await q("select id from public.profiles where email = 'pendfac@x.test'"))[0].id;
+  check("registering sets the gender and completes the profile", !(await tryQ("update public.profiles set gender = 'female', details_complete = true where id = $1", [pendId])).error);
+  check("a registered facilitator can't lose their gender again", !!(await tryQ("update public.profiles set gender = null where id = $1", [pendId])).error);
+}
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getActor, getCampus } from "@/lib/auth";
-import { createAccount, resendInvitation, resetPasswordDirectly, setAccountActive } from "@/lib/accounts";
+import { createAccount, inviteStaffByEmail, resendInvitation, resetPasswordDirectly, setAccountActive } from "@/lib/accounts";
+import { looksLikeEmail } from "@/lib/phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { usesProgramList } from "@/lib/course";
@@ -54,6 +55,36 @@ export async function createAccountAction(
 
   refresh();
   return { ok: true, message: `Invitation sent to ${parsed.value.email}.` };
+}
+
+/**
+ * Invite a Campus Head or facilitator with just their email. They get a 6-digit code, register themselves and fill in
+ * their own details. (Students are still registered with their details by a facilitator or Campus Head.)
+ */
+export async function inviteStaffAction(
+  role: Role,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await getActor("super_admin", "campus_head");
+  if (!actor || (role !== "campus_head" && role !== "facilitator") || !creatableRoles(actor.role).includes(role)) {
+    return FORBIDDEN;
+  }
+
+  const campusId = resolveCampusId(actor, formData);
+  if (!campusId) return { ok: false, error: "Select a campus." };
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!looksLikeEmail(email)) return { ok: false, error: "Enter a valid email address." };
+
+  const campus = await getCampus(campusId);
+  if (!campus || !campus.is_active) return { ok: false, error: "That campus isn't available." };
+
+  const result = await inviteStaffByEmail({ role, campusId, email, createdBy: actor.id });
+  if (!result.ok) return result;
+
+  refresh();
+  return { ok: true, message: `Invitation sent to ${email}. They register with the code in the email.` };
 }
 
 /** Can the actor manage this person (resend, deactivate)? */
@@ -134,12 +165,12 @@ export async function reassignFacilitatorAction(studentId: string, facilitatorId
   if (facilitatorId) {
     const { data: facilitator } = await supabase
       .from("profiles")
-      .select("id, campus_id, role, is_active")
+      .select("id, campus_id, role, is_active, details_complete")
       .eq("id", facilitatorId)
-      .maybeSingle<Pick<Profile, "id" | "campus_id" | "role" | "is_active">>();
+      .maybeSingle<Pick<Profile, "id" | "campus_id" | "role" | "is_active" | "details_complete">>();
     // A facilitator can work at several campuses, so "from your campus" means one who works here, not only one set here.
     const { data: worksHere } = await supabase.rpc("works_at", { p_user: facilitatorId, p_campus: actor.campus_id });
-    if (!facilitator || facilitator.role !== "facilitator" || !facilitator.is_active || worksHere !== true) {
+    if (!facilitator || facilitator.role !== "facilitator" || !facilitator.is_active || !facilitator.details_complete || worksHere !== true) {
       return { ok: false, error: "Pick an active facilitator from your campus." };
     }
   }

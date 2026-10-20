@@ -64,6 +64,11 @@ Supabase sends these emails, and their design lives in Supabase, not in this rep
   URLs from step 3: `node --env-file=.env.local scripts/apply-email-templates.mjs --site-url https://<project-name>.vercel.app`.
   The token can manage all your Supabase projects, so delete it afterwards.
 
+**The invitation now carries a registration code** (people invited with just their email register at `/register`). After
+pasting the new `invite.html`, also set **Authentication → Providers → Email → Email OTP Length** to **6** (new projects default
+to 8) and choose a longer **Email OTP Expiration** (for example 24 hours), otherwise the code stops working after an hour.
+Re-sending the invitation always makes a fresh code.
+
 The logo and tagline in the email are images from this website (`/brand/email-header.png`, `/brand/email-tagline.png`), so the
 site must be deployed and the Supabase **Site URL** must be its address. If a mail app blocks images the alt text still reads
 "Elevate Campus Hub".

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIVACY_VERSION } from "@/lib/privacy";
+import { placeholderName } from "@/lib/registration";
 import type { AccountFields } from "@/lib/validation";
 import type { Profile, Role } from "@/lib/types";
 
@@ -124,15 +125,76 @@ export async function createAccount(params: {
   return { ok: true, profileId: userId };
 }
 
+/**
+ * Invites a Campus Head or facilitator with ONLY their email. They register themselves with the 6-digit code in the
+ * email, and fill in their own name, gender and the rest then (`details_complete` stays false until they do).
+ */
+export async function inviteStaffByEmail(params: {
+  role: "campus_head" | "facilitator";
+  campusId: string;
+  email: string;
+  createdBy: string;
+}): Promise<Result<{ profileId: string }>> {
+  const { role, campusId, email, createdBy } = params;
+  const admin = createAdminClient();
+
+  // ilike without wildcards = case-insensitive exact match; escape the characters that act as wildcards.
+  const { data: emailTaken } = await admin
+    .from("profiles")
+    .select("id")
+    .ilike("email", email.replace(/[\\%_]/g, (c) => `\\${c}`))
+    .maybeSingle();
+  if (emailTaken) return { ok: false, error: "Someone is already registered with that email." };
+
+  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${await siteUrl()}/auth/confirm`,
+  });
+  if (inviteError || !invited.user) {
+    return { ok: false, error: friendlyAuthError(inviteError?.message ?? "Could not send the invitation.") };
+  }
+  const userId = invited.user.id;
+
+  const { error: metaError } = await admin.auth.admin.updateUserById(userId, {
+    app_metadata: { role, campus_id: campusId },
+  });
+  if (metaError) {
+    await admin.auth.admin.deleteUser(userId);
+    return { ok: false, error: metaError.message };
+  }
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: userId,
+    campus_id: campusId,
+    role,
+    // Placeholders until they register: the person's own name replaces these.
+    first_name: placeholderName(email),
+    last_name: "",
+    email,
+    details_complete: false,
+    invitation_sent_at: new Date().toISOString(),
+    created_by: createdBy,
+  });
+  if (profileError) {
+    await admin.auth.admin.deleteUser(userId);
+    if (profileError.code === "23505") return { ok: false, error: "That email is already registered." };
+    return { ok: false, error: profileError.message };
+  }
+
+  return { ok: true, profileId: userId };
+}
+
 /** Re-sends the invitation email to someone who hasn't accepted yet. */
-export async function resendInvitation(profile: Pick<Profile, "id" | "email" | "first_name" | "last_name" | "invitation_accepted_at">): Promise<Result> {
+export async function resendInvitation(
+  profile: Pick<Profile, "id" | "email" | "first_name" | "last_name" | "invitation_accepted_at" | "details_complete">,
+): Promise<Result> {
   if (profile.invitation_accepted_at) {
     return { ok: false, error: "This person already accepted their invitation." };
   }
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.inviteUserByEmail(profile.email, {
     redirectTo: `${await siteUrl()}/auth/confirm`,
-    data: { first_name: profile.first_name, last_name: profile.last_name },
+    // Someone invited by email only has no real name yet, so the email says just "Welcome!".
+    data: profile.details_complete ? { first_name: profile.first_name, last_name: profile.last_name } : undefined,
   });
 
   if (error) {

@@ -4,10 +4,15 @@
   Body:     paste everything from the doctype line down (the HTML, not this comment).
   (Or run `npm run supabase:email-templates` to apply both templates for you.)
 
+  The email carries a REGISTRATION CODE ({{ .Token }}). The person opens {{ .SiteURL }}/register (the button, with their email
+  already filled in), types the code, then completes their registration (name, details, password). The code is Supabase's
+  email OTP: set "Email OTP Length" to 6 (and choose how long it stays valid) under Authentication > Providers > Email.
+  The one-time link ({{ .TokenHash }}) is kept as a backup and lands on /auth/confirm, which signs the person in and sends
+  them to the same "Complete your registration" page.
+
   The logo and tagline are images served by the app itself ({{ .SiteURL }}/brand/...), rendered from the same
   font and mark as the website, so the Supabase "Site URL" must be the deployed address. If an email app blocks images, the
-  alt text still reads "Elevate Campus Hub". The button lands on /auth/confirm, which signs the person in and
-  sends them straight to "Choose your password".
+  alt text still reads "Elevate Campus Hub".
   Colours: black #0A0A0A, white, Elevate red #ED482D (button #D93A1E so the white text stays readable).
 -->
 <!doctype html>
@@ -22,7 +27,7 @@
   <body style="margin:0;padding:0;background-color:#f5f5f2;">
     <!-- Preview text shown next to the subject in the inbox -->
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f5f5f2;">
-      Choose your password to finish setting up your account.
+      Your registration code is {{ .Token }}. Use it to finish setting up your account.
     </div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f2;">
@@ -46,28 +51,39 @@
                 <h1 style="margin:0 0 14px 0;font-size:27px;line-height:33px;font-weight:bold;color:#0a0a0a;">
                   {{ if .Data.first_name }}Welcome, {{ .Data.first_name }}!{{ else }}Welcome!{{ end }}
                 </h1>
-                <p style="margin:0 0 12px 0;font-size:16px;line-height:25px;color:#0a0a0a;">
-                  You've been added to Elevate Campus Hub, where your campus team checks students in and follows up
-                  with every conversation.
-                </p>
-                <p style="margin:0 0 26px 0;font-size:16px;line-height:25px;color:#0a0a0a;">
-                  Choose a password to finish setting up your account. It only takes a minute.
+                <p style="margin:0 0 20px 0;font-size:16px;line-height:25px;color:#0a0a0a;">
+                  You've been invited to Elevate Campus Hub, where your campus team checks students in and follows up
+                  with every conversation. Register with the code below. It only takes a minute.
                 </p>
 
-                <!-- Button -->
+                <!-- The 6-digit registration code -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px 0;">
+                  <tr>
+                    <td align="center" bgcolor="#f5f5f2" style="background-color:#f5f5f2;border:1px solid #e1e1dc;border-radius:10px;padding:18px 10px 16px 10px;">
+                      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;color:#5a5a56;margin:0 0 6px 0;">
+                        Your registration code
+                      </div>
+                      <div style="font-family:'Courier New',Courier,monospace;font-size:38px;line-height:44px;font-weight:bold;letter-spacing:10px;color:#0a0a0a;">
+                        {{ .Token }}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Button: opens the Register page with their email already filled in -->
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td align="center" bgcolor="#d93a1e" style="background-color:#d93a1e;border-radius:8px;">
-                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite"
+                      <a href="{{ .SiteURL }}/register?email={{ .Email }}"
                          style="display:inline-block;padding:15px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">
-                        Set up my account
+                        Register with my code
                       </a>
                     </td>
                   </tr>
                 </table>
 
                 <p style="margin:26px 0 0 0;font-size:13px;line-height:20px;color:#5a5a56;">
-                  This link works once. If it stops working, ask your Campus Head to send you a new invitation.
+                  The code works once, for a short time. If it stops working, ask your Campus Head or IT to send you a new invitation.
                 </p>
               </td>
             </tr>
@@ -83,10 +99,12 @@
             <!-- Footer -->
             <tr>
               <td style="padding:20px 8px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5a5a56;">
-                Button not working? Copy this address into your browser:<br />
+                Or go to <span style="color:#d93a1e;">{{ .SiteURL }}/register</span> and type your email and the code.
+                <br /><br />
+                Prefer a link? This one-time link signs you in and takes you straight to registration:<br />
                 <span style="word-break:break-all;color:#d93a1e;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=invite</span>
                 <br /><br />
-                Didn't expect this email? You can safely ignore it. Nothing happens unless you open the link.
+                Didn't expect this email? You can safely ignore it. Nothing happens unless you use the code or the link.
                 <br />
                 <a href="{{ .SiteURL }}/privacy" style="color:#5a5a56;">Data Privacy Notice</a>
               </td>

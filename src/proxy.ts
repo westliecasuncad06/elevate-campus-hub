@@ -4,7 +4,7 @@ import { SETUP_HELP_HTML, isSupabaseConfigured } from "@/lib/env";
 import { ROLE_HOME, isRole } from "@/lib/roles";
 
 // Paths reachable without a session. /api/cron/* is protected by CRON_SECRET in the route.
-const PUBLIC_PREFIXES = ["/login", "/auth", "/api/cron", "/privacy"];
+const PUBLIC_PREFIXES = ["/login", "/register", "/auth", "/api/cron", "/privacy"];
 
 function isPublic(pathname: string) {
   // "/" is the public front page (signed-in people are sent on to their home further down).

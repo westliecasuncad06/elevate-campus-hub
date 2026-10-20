@@ -32,6 +32,26 @@ and **Live** (who is facilitating right now and who they're with; refreshes ever
 > attendance becomes finished batches in History). A brand-new project only needs `supabase/setup.sql`,
 > which already includes it.
 
+### Adding a Campus Head or facilitator: email only
+
+**Add facilitator** (Campus Head or Super Admin) and **Add campus head** (Super Admin) ask for **just the email** (and the campus,
+for the Super Admin). The person is sent an invitation with a **registration code**, and then registers themselves:
+
+1. They open the **Register** button in the email (or go to `/register`), type the code (their email is already filled in),
+2. then **Complete your registration**: their own name, gender, phone, birthday and a password, and they accept the Data
+   Privacy Notice themselves.
+
+A facilitator's gender is required (it decides who they can chat with); a Campus Head's is optional. Until they register the
+person shows as **Pending invitation**, is called by their email, can't sign in, and can't be given students. **Resend invitation**
+sends a fresh code. The email also has a one-time link as a backup, which leads to the same registration page. Students are
+still registered with their details by a facilitator or Campus Head.
+
+Two things to set in Supabase (the code comes from Supabase's email OTP, so they live there):
+- Paste the new invitation email, [docs/email-templates/invite.html](docs/email-templates/invite.html), into **Authentication →
+  Email Templates → Invite user** (it shows the code and the Register button).
+- **Authentication → Providers → Email → Email OTP Length: 6** (a new project defaults to 8; the app accepts 6 to 10 digits), and
+  pick how long a code stays valid (**Email OTP Expiration**), for example a day.
+
 ### Managing users (Super Admin)
 
 **Users** lists everyone with a login. Each row has **Edit**, **Reset password**, **Deactivate** and **Delete**.

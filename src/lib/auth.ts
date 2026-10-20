@@ -27,7 +27,8 @@ export async function requireProfile(): Promise<Profile> {
   // otherwise /login and the app keep redirecting to each other.
   if (!profile) redirect("/auth/signout?reason=no_profile");
   if (!profile.is_active) redirect("/auth/signout?reason=inactive");
-  if (!profile.password_changed) redirect("/set-password");
+  // Someone invited by email only also has to tell us who they are before they get in.
+  if (!profile.password_changed || !profile.details_complete) redirect("/set-password");
   // Everyone must have accepted the CURRENT Data Privacy Notice (existing accounts are asked once).
   if (profile.privacy_accepted_version !== PRIVACY_VERSION) redirect("/accept-privacy");
   return profile;

@@ -44,6 +44,8 @@ export interface Profile {
   qr_token: string | null;
   is_active: boolean;
   password_changed: boolean;
+  /** False for someone invited by email only, until they register and fill in their own details. */
+  details_complete: boolean;
   invitation_sent_at: string | null;
   invitation_accepted_at: string | null;
   created_by: string | null;
