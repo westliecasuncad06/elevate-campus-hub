@@ -1,0 +1,84 @@
+# Deploying Elevate Campus Hub
+
+The app runs on **Vercel** (the website) and uses **Supabase** (database, sign-in, realtime), which you already have.
+Nothing else is needed.
+
+## 1. Before you start
+
+- The code is on GitHub (`main` branch) and `npm run build` passes.
+- The database is already migrated (`npm run db:migrate` reports "up to date").
+- Pick the project name you will give Vercel. Your address will be `https://<project-name>.vercel.app`.
+
+## 2. Create the Vercel project
+
+1. Sign in at <https://vercel.com> with GitHub.
+2. **Add New → Project** → import `elevate-campus-hub`.
+3. Leave **Framework Preset** = Next.js and **Root Directory** = `./`. Don't change the build settings.
+4. Before pressing **Deploy**, open **Environment Variables** and add the variables below (apply to **Production** and **Preview**).
+
+### Environment variables
+
+| Name | Value | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | same as `.env.local` | Supabase → Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same as `.env.local` | the publishable / anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | same as `.env.local` | **secret**: mark it *Sensitive* in Vercel |
+| `NEXT_PUBLIC_SITE_URL` | `https://<project-name>.vercel.app` | **required**: invitation links are built from it |
+| `CRON_SECRET` | a long random string (32+ chars) | the keep-alive job checks it |
+| `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` | the Apps Script web app URL | optional until reports are set up |
+| `NEXT_PUBLIC_PRIVACY_CONTACT` | e.g. `dpo@yourchurch.org` | optional; shown in the Data Privacy Notice |
+
+Do **not** add `SUPABASE_DB_URL`, `SEED_*` or `DEMO_*`: they are only for your own computer.
+`NEXT_PUBLIC_*` values are baked into the build, so after changing one you must **Redeploy**.
+
+Generate a `CRON_SECRET` in PowerShell:
+
+```powershell
+-join ((48..57)+(65..90)+(97..122) | Get-Random -Count 40 | ForEach-Object {[char]$_})
+```
+
+5. Press **Deploy**. If you did not know the address yet, deploy once, copy the address Vercel gives you, set
+   `NEXT_PUBLIC_SITE_URL` to it, then **Deployments → ⋯ → Redeploy**.
+
+`vercel.json` already sets the function region to Sydney (`syd1`, next to the Supabase database) and the keep-alive cron.
+
+## 3. Tell Supabase about the new address
+
+Supabase → **Authentication → URL Configuration**:
+
+- **Site URL**: `https://<project-name>.vercel.app` (the email templates build their button from this).
+- **Redirect URLs**: add `https://<project-name>.vercel.app/**` and keep `http://localhost:3000/**` for local work.
+
+While testing, invitation emails always point at the **Site URL**. Switch it back to `http://localhost:3000` only if you
+are testing invitations locally.
+
+## 4. Check it works
+
+1. Open the address: you should see the landing page. **Sign in** with a real account.
+2. Super Admin → **Users** → add a test person with an email you own → open the invitation email → set a password.
+3. **Keep-alive cron**: Vercel → project → **Settings → Cron Jobs** → run `/api/cron/keep-alive`. In the app,
+   Super Admin → **Overview** → "Database keep-alive" should say *Healthy* with a fresh time. (Crons only run on the
+   **Production** deployment. Hobby plans run them once a day at most; ours is every 3 days.)
+4. Try the scanner on a real phone (the camera needs the https address).
+
+## 5. Before real students use it
+
+- [ ] Remove the demo accounts (`demo.*@example.test`): Super Admin → Users → Deactivate, or delete them in Supabase.
+- [ ] Change the database password (Supabase → Project Settings → Database) and update `SUPABASE_DB_URL` locally.
+- [ ] Have your Data Protection Officer / legal counsel review the notice in `src/lib/privacy.ts` (then bump `PRIVACY_VERSION`).
+- [ ] Set up the Google Apps Script (`docs/google-apps-script/Code.gs`) and add `GOOGLE_APPS_SCRIPT_WEBHOOK_URL`.
+- [ ] Paste the branded email templates (`docs/email-templates/`) into Supabase if you haven't.
+- [ ] Keep the SMTP provider's sending limits in mind (Supabase → Authentication → SMTP Settings).
+- [ ] Vercel's free **Hobby** plan is for personal, non-commercial use. If this is run officially by an organisation, check
+      Vercel's terms and consider the Pro plan.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| "Almost there: connect Supabase" page | The two `NEXT_PUBLIC_SUPABASE_*` variables are missing or still placeholders. Add them and redeploy. |
+| Invitation button opens `localhost` | `NEXT_PUBLIC_SITE_URL` or the Supabase **Site URL** is still `http://localhost:3000`. |
+| Invitation link says it expired / redirects to login | Add the Vercel address to Supabase **Redirect URLs**; links are single-use. |
+| Sign-in loops or logs you out | Check the `SUPABASE_SERVICE_ROLE_KEY` and that the Site URL is `https`. |
+| Cron shows 401 | `CRON_SECRET` is missing in Vercel. Add it (Production) and redeploy. |
+| Pages are slow | Confirm the function region is `syd1` (Project → Settings → Functions). |

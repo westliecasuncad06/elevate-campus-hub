@@ -158,6 +158,8 @@ The Google Form step is a placeholder until the target form's fields are known.
 
 ## Deploying to Vercel
 
+Full step-by-step guide, environment variables and a go-live checklist: **[DEPLOYMENT.md](DEPLOYMENT.md)**. Short version:
+
 1. Push this folder to a GitHub repository.
 2. <https://vercel.com> → **Add New → Project** → import the repository.
 3. Add the environment variables from `.env.local` (set `NEXT_PUBLIC_SITE_URL` to your Vercel URL).
