@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Field, SubmitButton } from "@/components/forms";
+import { LiveFilters, LiveSearch } from "@/components/live-filters";
 import { EmptyState, PageHeader, StatCard } from "@/components/page-header";
 import { RemoveRosterButton } from "@/components/roster/remove-roster-button";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,14 @@ export default async function RosterPage({ searchParams }: PageProps<"/campus-he
 
   const all = total ?? 0;
   const done = registered ?? 0;
-  const href = (value: string) => `/campus-head/roster${value === "all" ? "" : `?filter=${value}`}`;
+  // The status buttons keep whatever is typed in the search box.
+  const href = (value: string) => {
+    const params = new URLSearchParams();
+    if (value !== "all") params.set("filter", value);
+    if (q) params.set("q", q);
+    const query = params.toString();
+    return "/campus-head/roster" + (query ? "?" + query : "");
+  };
 
   return (
     <>
@@ -78,11 +85,10 @@ export default async function RosterPage({ searchParams }: PageProps<"/campus-he
           </div>
 
           <div className="mb-4 flex flex-wrap items-end gap-3">
-            <form method="get" className="flex flex-1 flex-wrap items-end gap-2">
-              {filter !== "all" ? <input type="hidden" name="filter" value={filter} /> : null}
-              <Field label="Search" name="q" defaultValue={q} placeholder="Name" className="min-w-52 flex-1" />
-              <SubmitButton variant="secondary">Search</SubmitButton>
-            </form>
+            {/* Filters as you type: no Search button. */}
+            <LiveFilters params={["q"]} className="flex min-w-64 flex-1 items-end gap-2 !border-0 !bg-transparent !p-0">
+              <LiveSearch placeholder="Name" className="min-w-52 flex-1" />
+            </LiveFilters>
             <div className="flex flex-wrap gap-2">
               {FILTERS.map((f) => (
                 <Button key={f.value} variant={filter === f.value ? "default" : "outline"} nativeButton={false} render={<Link href={href(f.value)} />}>

@@ -4,7 +4,7 @@ import { TriangleAlertIcon } from "lucide-react";
 import { AccountDialog } from "@/components/accounts/account-dialog";
 import { ActiveToggleButton, ReassignFacilitator, ResendInviteButton, ResetTwoStepButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
-import { Field, SubmitButton } from "@/components/forms";
+import { LiveFilters, LiveSearch } from "@/components/live-filters";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,6 +18,15 @@ import { fullName, type Profile } from "@/lib/types";
 export const metadata: Metadata = { title: "Students" };
 
 type StudentRow = Profile & { program: { code: string } | null };
+
+/** The Pending invitations button keeps whatever is typed in the search box. */
+function pendingHref(pendingOnly: boolean, q: string): string {
+  const params = new URLSearchParams();
+  if (!pendingOnly) params.set("filter", "pending");
+  if (q) params.set("q", q);
+  const query = params.toString();
+  return "/campus-head/students" + (query ? "?" + query : "");
+}
 
 export default async function StudentsPage({ searchParams }: PageProps<"/campus-head/students">) {
   const actor = await requireRole("campus_head");
@@ -68,12 +77,11 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <form method="get" className="flex flex-1 flex-wrap items-end gap-2">
-          {pendingOnly ? <input type="hidden" name="filter" value="pending" /> : null}
-          <Field label="Search" name="q" defaultValue={q} placeholder="Name, email or phone" className="min-w-52 flex-1" />
-          <SubmitButton variant="secondary">Search</SubmitButton>
-        </form>
-        <Button variant={pendingOnly ? "default" : "outline"} nativeButton={false} render={<Link href={pendingOnly ? "/campus-head/students" : "/campus-head/students?filter=pending"} />}>
+        {/* Filters as you type: no Search button. */}
+        <LiveFilters params={["q"]} className="flex min-w-64 flex-1 items-end gap-2 !border-0 !bg-transparent !p-0">
+          <LiveSearch placeholder="Name, email or phone" className="min-w-52 flex-1" />
+        </LiveFilters>
+        <Button variant={pendingOnly ? "default" : "outline"} nativeButton={false} render={<Link href={pendingHref(pendingOnly, q)} />}>
           Pending invitations ({pendingCount ?? 0})
         </Button>
       </div>

@@ -5,8 +5,7 @@ import { EditUserDialog } from "@/components/accounts/edit-user-dialog";
 import { InviteStaffDialog } from "@/components/accounts/invite-staff-dialog";
 import { ActiveToggleButton, ResendInviteButton, ResetPasswordButton, ResetTwoStepButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
-import { FormSelect, SubmitButton } from "@/components/forms";
-import { Field } from "@/components/forms";
+import { LiveFilters, LiveSearch, LiveSelect } from "@/components/live-filters";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
@@ -69,12 +68,12 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
         }
       />
 
-      <form method="get" className="mb-4 grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[1fr_10rem_10rem_auto] sm:items-end">
-        <Field label="Search" name="q" defaultValue={q} placeholder="Name, email or phone" />
-        <FormSelect
+      {/* Filters that apply as you type or pick: no Filter button. */}
+      <LiveFilters params={["q", "role", "campus"]} className="mb-4 grid gap-3 sm:grid-cols-[1fr_10rem_10rem_6.5rem] sm:items-end">
+        <LiveSearch placeholder="Name, email or phone" />
+        <LiveSelect
           label="Role"
-          name="role"
-          defaultValue={role}
+          param="role"
           options={[
             { value: "all", label: "All roles" },
             ...(["super_admin", "campus_head", "facilitator", "student"] as const).map((r) => ({
@@ -83,14 +82,12 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
             })),
           ]}
         />
-        <FormSelect
+        <LiveSelect
           label="Campus"
-          name="campus"
-          defaultValue={campus}
+          param="campus"
           options={[{ value: "all", label: "All campuses" }, ...campuses.map((c) => ({ value: c.id, label: c.code }))]}
         />
-        <SubmitButton variant="secondary">Filter</SubmitButton>
-      </form>
+      </LiveFilters>
 
       {people.length === 0 ? (
         <EmptyState title="No one matches" hint="Try a different search, or clear the filters." />
