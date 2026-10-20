@@ -184,6 +184,18 @@ check("batch 2 finishes once its student is recorded", r.rows?.[0].r.action === 
 r = await asUser(facM, () => tryQ("update public.engagement_batches set status = 'open', finished_at = null where id = $1 returning id", [b1]));
 check("a finished batch can't be reopened by editing the table", !r.rows?.length, "row updated");
 
+// Attendance sheet helpers (migration 0008): one row per student, plus the days the campus actually met
+{
+  const byStudent = await asUser(head1, () => q("select student_id, dates::text[] as dates from public.attendance_dates_by_student($1, $2::date, $2::date)", [c1, todayManila]));
+  check("attendance_dates_by_student returns one row per student with their dates", byStudent.length === 4 && byStudent.every((r) => r.dates.length === 1 && r.dates[0] === todayManila), JSON.stringify(byStudent));
+  const days = await asUser(head1, () => q("select * from public.attendance_session_dates($1, $2::date, $2::date)", [c1, todayManila]));
+  check("attendance_session_dates returns the days the campus met", days.length === 1);
+  check("another campus's head sees no attendance rows", (await asUser(head2, () => q("select * from public.attendance_dates_by_student($1, $2::date, $2::date)", [c1, todayManila]))).length === 0);
+  check("a student sees only their own row", (await asUser(stuM, () => q("select student_id from public.attendance_dates_by_student($1, $2::date, $2::date)", [c1, todayManila]))).length === 1);
+  const none = await q("select * from public.attendance_dates_by_student($1, '2000-01-01', '2000-01-02')", [c1]);
+  check("an empty range returns nothing", none.length === 0);
+}
+
 const totals = (await asUser(head1, () => q("select * from public.compute_daily_report($1, $2::date)", [c1, todayManila])))[0];
 // 4 students attended (stuM, stuF, stuM3 via facM; stuM2 via the Campus Head). stuM: engaged+gospel+accepted+dgroup,
 // stuF: not engaged, stuM3: engaged+gospel. Volunteers = facilitators who added someone: only facM (a Campus Head doesn't count).

@@ -25,7 +25,7 @@ Nothing else is needed.
 | `SUPABASE_SERVICE_ROLE_KEY` | same as `.env.local` | **secret**: mark it *Sensitive* in Vercel |
 | `NEXT_PUBLIC_SITE_URL` | `https://<project-name>.vercel.app` | **required**: invitation links are built from it |
 | `CRON_SECRET` | a long random string (32+ chars) | the keep-alive job checks it |
-| `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` | the Apps Script web app URL | optional until reports are set up |
+| `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` | the Apps Script web app URL | only for the "Send to a Google Doc" report; the Google Form needs no variable |
 | `NEXT_PUBLIC_PRIVACY_CONTACT` | e.g. `dpo@yourchurch.org` | optional; shown in the Data Privacy Notice |
 
 Do **not** add `SUPABASE_DB_URL`, `SEED_*` or `DEMO_*`: they are only for your own computer.
@@ -82,7 +82,9 @@ site must be deployed and the Supabase **Site URL** must be its address. If a ma
 - [ ] Remove the demo accounts (`demo.*@example.test`): Super Admin → Users → Deactivate, or delete them in Supabase.
 - [ ] Change the database password (Supabase → Project Settings → Database) and update `SUPABASE_DB_URL` locally.
 - [ ] Have your Data Protection Officer / legal counsel review the notice in `src/lib/privacy.ts` (then bump `PRIVACY_VERSION`).
-- [ ] Set up the Google Apps Script (`docs/google-apps-script/Code.gs`) and add `GOOGLE_APPS_SCRIPT_WEBHOOK_URL`.
+- [ ] Check **Campuses → Edit** has the report Google Form link and School/Location for each campus (GRC is already set), and that the form accepts responses without a sign-in.
+- [ ] Send one real report from **Daily report → Send to Google Form** and check it arrives in the form's responses.
+- [ ] Only if you use "Send to a Google Doc": set up the Google Apps Script (`docs/google-apps-script/Code.gs`) and add `GOOGLE_APPS_SCRIPT_WEBHOOK_URL`.
 - [ ] Paste the branded email templates (`docs/email-templates/`) into Supabase if you haven't.
 - [ ] Keep the SMTP provider's sending limits in mind (Supabase → Authentication → SMTP Settings).
 - [ ] Vercel's free **Hobby** plan is for personal, non-commercial use. If this is run officially by an organisation, check

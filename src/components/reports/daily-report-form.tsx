@@ -34,12 +34,15 @@ export function DailyReportForm({
   date,
   calculated,
   saved,
+  location,
   notes,
   locked,
 }: {
   date: string;
   calculated: ReportNumbers;
   saved: ReportNumbers | null;
+  /** Pre-filled School/Location: this day's saved value, else the campus default. */
+  location: string;
   notes: string | null;
   locked: boolean;
 }) {
@@ -69,6 +72,12 @@ export function DailyReportForm({
           This report is locked. Unlock it to make changes.
         </p>
       ) : null}
+
+      <div className="grid gap-1.5 sm:max-w-md">
+        <Label htmlFor="location">School/Location</Label>
+        <Input id="location" name="location" defaultValue={location} disabled={locked} maxLength={120} />
+        <p className="text-xs text-muted-foreground">Goes in the report’s School/Location answer.</p>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {FIELDS.map(({ key, label }) => {

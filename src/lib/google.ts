@@ -8,6 +8,8 @@ export interface DocsReportPayload {
   type: "docs";
   docId: string;
   campusName: string;
+  /** The "School/Location" the ministry's report uses. */
+  location: string;
   dateFrom: string;
   dateTo: string;
   totalAttendance: number;
@@ -19,20 +21,13 @@ export interface DocsReportPayload {
   submittedBy: string;
 }
 
-export interface FormReportPayload extends Omit<DocsReportPayload, "type" | "docId"> {
-  type: "form";
-  formUrl: string | null;
-}
-
-export type AppsScriptPayload = DocsReportPayload | FormReportPayload;
-
 /**
  * POSTs a report to the Google Apps Script web app (see docs/google-apps-script/Code.gs).
  * Apps Script answers with a 302 to the result, which fetch follows automatically.
  */
 export async function sendToAppsScript(
   webhookUrl: string,
-  payload: AppsScriptPayload,
+  payload: DocsReportPayload,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const response = await fetch(webhookUrl, {

@@ -40,10 +40,18 @@ function CampusFields({ campus }: { campus?: Campus }) {
         placeholder="https://docs.google.com/document/d/…"
       />
       <Field
-        label="Google Form webhook URL (optional)"
-        name="google_form_webhook_url"
-        defaultValue={campus?.google_form_webhook_url ?? ""}
-        placeholder="https://script.google.com/macros/s/…/exec"
+        label="Report Google Form link (optional)"
+        name="google_form_url"
+        defaultValue={campus?.google_form_url ?? ""}
+        placeholder="https://docs.google.com/forms/d/e/…/viewform"
+        hint="The Campus Head's daily report can be sent to this form. It must accept responses without a Google sign-in."
+      />
+      <Field
+        label="School/Location on reports (optional)"
+        name="report_location"
+        defaultValue={campus?.report_location ?? ""}
+        placeholder={campus?.name ?? "Global Reciprocal Colleges"}
+        hint="Fills the form's School/Location question. Leave empty to use the campus name."
       />
     </div>
   );

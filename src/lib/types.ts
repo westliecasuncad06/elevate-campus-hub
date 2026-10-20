@@ -9,6 +9,10 @@ export interface Campus {
   timezone: string;
   target_google_doc_id: string | null;
   google_form_webhook_url: string | null;
+  /** The ministry's report Google Form (".../forms/d/e/<id>/viewform"). */
+  google_form_url: string | null;
+  /** Default "School/Location" on that form, e.g. "Global Reciprocal Colleges". */
+  report_location: string | null;
   is_active: boolean;
   created_at: string;
 }

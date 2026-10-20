@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getActor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { extractGoogleDocId } from "@/lib/google";
+import { formAddresses } from "@/lib/google-form";
 import type { ActionResult } from "@/lib/types";
 
 function isValidTimezone(tz: string): boolean {
@@ -28,7 +29,8 @@ export async function saveCampusAction(
   const name = String(formData.get("name") ?? "").trim();
   const timezone = String(formData.get("timezone") ?? "").trim() || "Asia/Manila";
   const docInput = String(formData.get("target_google_doc") ?? "").trim();
-  const formWebhook = String(formData.get("google_form_webhook_url") ?? "").trim();
+  const formUrl = String(formData.get("google_form_url") ?? "").trim();
+  const reportLocation = String(formData.get("report_location") ?? "").trim();
   const isActive = formData.get("is_active") !== "off";
 
   if (!/^[A-Z0-9_-]{2,12}$/.test(code)) {
@@ -40,16 +42,21 @@ export async function saveCampusAction(
   // Accept either a full Google Docs URL or a bare document ID.
   const docId = docInput ? (extractGoogleDocId(docInput) ?? (/^[a-zA-Z0-9-_]{20,}$/.test(docInput) ? docInput : null)) : null;
   if (docInput && !docId) return { ok: false, error: "That doesn't look like a Google Docs link." };
-  if (formWebhook && !/^https:\/\//.test(formWebhook)) {
-    return { ok: false, error: "The Google Form webhook URL must start with https://" };
+  if (formUrl && !formAddresses(formUrl)) {
+    return {
+      ok: false,
+      error: "That isn't a Google Form link. Use the one that looks like docs.google.com/forms/d/e/…/viewform.",
+    };
   }
+  if (reportLocation.length > 120) return { ok: false, error: "Keep the School/Location under 120 characters." };
 
   const values = {
     code,
     name,
     timezone,
     target_google_doc_id: docId,
-    google_form_webhook_url: formWebhook || null,
+    google_form_url: formUrl || null,
+    report_location: reportLocation || null,
     is_active: isActive,
   };
 

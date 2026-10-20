@@ -11,10 +11,9 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
 
+    // The Google Form is submitted by the app itself, so this script only handles Google Docs.
     if (data.type === 'docs') {
       return handleDocAppend(data);
-    } else if (data.type === 'form') {
-      return handleFormSubmit(data);
     }
 
     return json({ success: false, error: 'Unknown type' });
@@ -30,6 +29,7 @@ function handleDocAppend(payload) {
   body.appendParagraph("═════════════════════════════════════════════");
   body.appendParagraph("ELEVATE CAMPUS HUB — ATTENDANCE & MINISTRY REPORT");
   body.appendParagraph("Campus: " + (payload.campusName || "GRC"));
+  body.appendParagraph("School/Location: " + (payload.location || payload.campusName || ""));
   body.appendParagraph("Date Range: " + payload.dateFrom + " to " + payload.dateTo);
   body.appendParagraph("Total Attendance: " + payload.totalAttendance);
   body.appendParagraph("Students Engaged: " + payload.studentsEngaged);
@@ -43,11 +43,6 @@ function handleDocAppend(payload) {
 
   doc.saveAndClose();
   return json({ success: true });
-}
-
-function handleFormSubmit(payload) {
-  // Form submission mapping will be configured once target Google Form fields are provided
-  return json({ success: true, message: 'Form submission endpoint ready' });
 }
 
 function json(obj) {

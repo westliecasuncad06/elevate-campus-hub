@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { PageHeader, StatCard } from "@/components/page-header";
 import { DailyReportForm, type ReportNumbers } from "@/components/reports/daily-report-form";
+import { GoogleFormPanel } from "@/components/reports/google-form-panel";
 import { SendReportPanel } from "@/components/reports/send-report-panel";
+import { FIELD_LABEL } from "@/lib/google-form";
 import { Field, SubmitButton } from "@/components/forms";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +16,7 @@ export const metadata: Metadata = { title: "Daily report" };
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 interface SavedReport extends ReportNumbers {
+  location: string | null;
   notes: string | null;
   is_locked: boolean;
 }
@@ -64,7 +67,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
   const to = pick("to", date);
 
   const supabase = await createClient();
-  const [calc, savedRes, summaryRes, submissionsRes, lastDoc] = await Promise.all([
+  const [calc, savedRes, summaryRes, submissionsRes, lastDoc, formSent] = await Promise.all([
     supabase.rpc("compute_daily_report", { p_campus_id: profile.campus_id, p_date: date }),
     supabase.from("daily_reports").select("*").eq("campus_id", profile.campus_id).eq("report_date", date).maybeSingle<SavedReport>(),
     from <= to
@@ -83,6 +86,16 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
       .order("submitted_at", { ascending: false })
       .limit(1)
       .maybeSingle<{ target_google_doc_url: string }>(),
+    supabase
+      .from("report_submissions")
+      .select("submitted_at")
+      .eq("submission_type", "google_form")
+      .eq("status", "submitted")
+      .eq("date_from", date)
+      .eq("date_to", date)
+      .order("submitted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ submitted_at: string }>(),
   ]);
 
   const calculated = one<ReportNumbers>(calc.data) ?? ZERO;
@@ -93,11 +106,24 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
     lastDoc.data?.target_google_doc_url ??
     (campus?.target_google_doc_id ? `https://docs.google.com/document/d/${campus.target_google_doc_id}/edit` : "");
 
+  const location = saved?.location?.trim() || campus?.report_location?.trim() || campus?.name || "";
+  const formAnswers = saved
+    ? [
+        { label: FIELD_LABEL.date, value: formatDate(date) },
+        { label: FIELD_LABEL.location, value: location },
+        { label: FIELD_LABEL.attendees, value: saved.total_attendance },
+        { label: FIELD_LABEL.heard, value: saved.students_heard_gospel },
+        { label: FIELD_LABEL.accepted, value: saved.students_accepted_jesus },
+        { label: FIELD_LABEL.dgroup, value: saved.students_wants_dgroup },
+        { label: FIELD_LABEL.volunteers, value: saved.volunteers_count },
+      ]
+    : [];
+
   const rangeDays = from <= to ? Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1 : 0;
 
   return (
     <>
-      <PageHeader title="Daily report" description="Check the numbers, adjust if needed, lock the day, then send it to Google." />
+      <PageHeader title="Daily report" description="Check the numbers, adjust if needed, save the day, then send it to the Google Form." />
 
       <section className="mb-10" aria-labelledby="daily-heading">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -127,14 +153,40 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
           date={date}
           calculated={calculated}
           saved={saved}
+          location={location}
           notes={saved?.notes ?? null}
           locked={saved?.is_locked ?? false}
         />
       </section>
 
+      <section className="mb-10" aria-labelledby="form-heading">
+        <h2 id="form-heading" className="mb-1 text-lg font-semibold">
+          Send to the Google Form
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Submits {formatDate(date)} to your ministry’s report form, using the saved numbers above.
+        </p>
+        {!campus?.google_form_url ? (
+          <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+            No Google Form link is set for this campus yet. Ask the Super Admin to add it under Campuses.
+          </p>
+        ) : !saved ? (
+          <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+            Save the daily report for this day first. Then you can send it to the form.
+          </p>
+        ) : (
+          <GoogleFormPanel
+            key={`${date}-${formSent.data?.submitted_at ?? "new"}`}
+            date={date}
+            answers={formAnswers}
+            sentAt={formSent.data ? formatDateTime(formSent.data.submitted_at, timezone) : null}
+          />
+        )}
+      </section>
+
       <section className="mb-10" aria-labelledby="send-heading">
         <h2 id="send-heading" className="mb-1 text-lg font-semibold">
-          Send to Google
+          Send to a Google Doc
         </h2>
         <p className="mb-4 text-sm text-muted-foreground">
           Pick the days to include. The totals are the sum of your saved daily reports.
@@ -167,13 +219,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
                 left out.
               </p>
             ) : null}
-            <SendReportPanel
-              key={`${from}-${to}`}
-              from={from}
-              to={to}
-              defaultDocUrl={defaultDocUrl}
-              hasFormTarget={Boolean(campus?.google_form_webhook_url || process.env.GOOGLE_APPS_SCRIPT_WEBHOOK_URL)}
-            />
+            <SendReportPanel key={`${from}-${to}`} from={from} to={to} defaultDocUrl={defaultDocUrl} />
           </>
         ) : (
           <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
@@ -188,7 +234,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
         </h2>
         {submissions.length === 0 ? (
           <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-            Reports you send to Google show up here with their status.
+            Reports you send to the Google Form or a Google Doc show up here with their status.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border bg-card">

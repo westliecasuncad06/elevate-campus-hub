@@ -10,7 +10,7 @@ The full specification is in [PROJECT_SPECIFICATION.md](PROJECT_SPECIFICATION.md
 | Role | What they do |
 |---|---|
 | Super Admin (IT) | Campuses, programs, all users, direct password resets, system logs |
-| Campus Head | Creates facilitators/students, scans attendance, reviews/locks the daily report, sends it to Google |
+| Campus Head | Creates facilitators/students, scans attendance, watches each student's consistency (**Attendance sheet**), reviews/locks the daily report, sends it to the Google Form |
 | Facilitator | Scans attendance, registers first timers, records engagement, chats with same-gender students |
 | Student | Own QR card, assigned facilitator, attendance history, chat |
 
@@ -31,6 +31,33 @@ and **Live** (who is facilitating right now and who they're with; refreshes ever
 > `supabase/migrations/0005_batches.sql` into the Supabase SQL Editor once. Either way your data is kept (earlier
 > attendance becomes finished batches in History). A brand-new project only needs `supabase/setup.sql`,
 > which already includes it.
+
+### Attendance sheet (Campus Head)
+
+**Attendance sheet** is the Campus Head's view of how consistently each student comes, laid out like the ministry's Google
+Sheet: one row per student (name, gender, year / course) and one column for every day the campus met. A ✓ means attended,
+a ✕ means not, and a dash means the day didn't count for that student.
+
+- A **session** is a day when at least one student was recorded. Pick any range (default: the last 90 days, up to a year).
+- A student is only counted against sessions held **after they registered**, and today's open session never counts as missed.
+- **Status** from the share of countable sessions attended: Consistent 80%+, Regular 50–79%, Occasional 20–49%, Rarely under 20%,
+  New with fewer than 2 sessions. **At risk** = came before but missed the last 3 or more in a row.
+- Filter by program, year, facilitator or status, search by name, sort (for example least consistent first), and **Export CSV**.
+
+### Daily report → Google Form
+
+The ministry's "Elevate Engagement Report" Google Form asks for the Date, School/Location, and the number engaged, who heard
+the Gospel, accepted Jesus, are willing to join a Dgroup, and volunteers. **Daily report** fills all seven from the saved day
+(*Engaged/Attendees* is the day's total attendance), shows them in a preview, and **Send to Google Form** submits them.
+
+- **School/Location** is editable per report and defaults to the campus's setting (GRC: "Global Reciprocal Colleges").
+- The Super Admin sets the form link and default School/Location under **Campuses → Edit**.
+- The app reads the form's questions when it sends, so it keeps working if Google renumbers the question IDs. If the
+  questions are changed so much that they can't be matched, it refuses and tells you instead of sending partial data.
+- A day that was already sent needs a ticked **Send again**, so the sheet doesn't get an accidental duplicate row.
+- Every attempt (sent or failed) is listed under **Sent reports** and in the system logs.
+
+> **Already ran `setup.sql` before this?** Run `npm run db:migrate` to apply `0008_form_report_and_attendance_sheet.sql`.
 
 ### Notifications
 
@@ -136,12 +163,15 @@ Sign in as the Super Admin, then: **Users → Add campus head** for GRC.
 
 ### 5. Google reports (optional until you need them)
 
+**Google Form:** nothing to deploy. The form must accept responses without a Google sign-in (don't tick "Limit to 1 response"
+or "Restrict to users in your organisation"), and its link goes in **Campuses → Edit**.
+
+**Google Doc** (adds a summary for a date range to a document) needs the Apps Script below:
+
 1. Open <https://script.google.com> → New project → paste [docs/google-apps-script/Code.gs](docs/google-apps-script/Code.gs).
 2. **Deploy → New deployment → Web app**, Execute as **Me**, access **Anyone**. Copy the Web app URL.
 3. Put it in `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` (and later in Vercel).
 4. Make sure the Google account that deployed the script can edit the target Google Doc.
-
-The Google Form step is a placeholder until the target form's fields are known.
 
 ## Scripts
 
