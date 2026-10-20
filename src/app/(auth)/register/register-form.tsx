@@ -1,5 +1,6 @@
 "use client";
 
+import { Honeypot, Turnstile } from "@/components/bot-guard";
 import { Field, FormMessage, SubmitButton } from "@/components/forms";
 import { useFormAction } from "@/components/use-form-action";
 import { registerWithCode } from "./actions";
@@ -8,7 +9,8 @@ export function RegisterForm({ email }: { email: string }) {
   const { state, pending, formProps } = useFormAction(registerWithCode);
 
   return (
-    <form {...formProps} className="grid gap-4">
+    <form {...formProps} className="relative grid gap-4">
+      <Honeypot />
       <Field
         label="Email"
         name="email"
@@ -16,6 +18,7 @@ export function RegisterForm({ email }: { email: string }) {
         autoComplete="email"
         defaultValue={email}
         hint="The address your invitation was sent to."
+        maxLength={254}
         required
         autoFocus={!email}
       />
@@ -30,6 +33,7 @@ export function RegisterForm({ email }: { email: string }) {
         required
         autoFocus={Boolean(email)}
       />
+      <Turnstile resetKey={state} />
       <FormMessage state={state} />
       <SubmitButton size="lg" pending={pending} pendingText="Checking…">
         Continue

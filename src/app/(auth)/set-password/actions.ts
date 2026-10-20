@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCampus, getSessionProfile, isGoogleSession } from "@/lib/auth";
 import { usesProgramList } from "@/lib/course";
+import { validateNewPassword } from "@/lib/password";
 import { todayInTimezone } from "@/lib/dates";
 import { PRIVACY_VERSION } from "@/lib/privacy";
 import { getActivePrograms } from "@/lib/queries";
@@ -23,7 +24,8 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
   // Someone who signed in with Google has already proven who they are, so for them a password is optional.
   const choosePassword = !(await isGoogleSession()) || password !== "" || confirm !== "";
   if (choosePassword) {
-    if (password.length < 8) return { ok: false, error: "Use at least 8 characters." };
+    const weak = validateNewPassword(password, profile.email);
+    if (weak) return { ok: false, error: weak };
     if (password !== confirm) return { ok: false, error: "The two passwords don't match." };
   }
 

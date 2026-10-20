@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { buildCsp } from "@/lib/csp";
 import { SETUP_HELP_HTML, isSupabaseConfigured } from "@/lib/env";
 import { ROLE_HOME, isRole } from "@/lib/roles";
 
@@ -28,7 +29,24 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  let response = NextResponse.next({ request });
+  // A fresh random nonce for this request. Next puts it on its own scripts; anything else is refused by the browser.
+  const nonce = btoa(crypto.randomUUID());
+  const csp = buildCsp({
+    nonce,
+    isDev: process.env.NODE_ENV === "development",
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    turnstile: Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY),
+  });
+  // The page renders with the policy in its REQUEST headers (that is how Next finds the nonce) and the browser gets it too.
+  const forward = () => {
+    const headers = new Headers(request.headers);
+    headers.set("x-nonce", nonce);
+    headers.set("Content-Security-Policy", csp);
+    const next = NextResponse.next({ request: { headers } });
+    next.headers.set("Content-Security-Policy", csp);
+    return next;
+  };
+  let response = forward();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,7 +58,7 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-          response = NextResponse.next({ request });
+          response = forward();
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }

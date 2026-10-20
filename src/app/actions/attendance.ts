@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { courseLabel, usesProgramList } from "@/lib/course";
 import { todayInTimezone } from "@/lib/dates";
 import { looksLikeEmail, normalizePhone } from "@/lib/phone";
+import { searchTerm } from "@/lib/postgrest";
 import { getActivePrograms } from "@/lib/queries";
+import { checkRateLimits, rateKey, tooManyMessage } from "@/lib/rate-limit";
 import { parseAccountForm } from "@/lib/validation";
 import type { ActionResult, EntryMethod, Profile } from "@/lib/types";
 
@@ -122,8 +124,11 @@ export async function lookupStudentsAction(
   const actor = await getActor("campus_head", "facilitator");
   if (!actor) return FORBIDDEN;
 
-  const query = rawQuery.trim();
+  const query = rawQuery.trim().slice(0, 100);
   if (query.length < 3) return { ok: false, error: "Type a phone number or email address." };
+  // Someone scripting guesses at student emails and phone numbers would show up here as a flood of lookups.
+  const rate = await checkRateLimits([{ key: rateKey("lookup:user", actor.id), limit: 150, windowSeconds: 300 }]);
+  if (!rate.ok) return { ok: false, error: tooManyMessage(rate.retryAfter) };
 
   const supabase = await createClient();
   let builder = supabase
@@ -143,7 +148,8 @@ export async function lookupStudentsAction(
     method = "phone";
     builder = builder.eq("phone", normalizePhone(query));
   } else {
-    const safe = query.replace(/[,()%*_\\]/g, " ").trim();
+    const safe = searchTerm(query);
+    if (safe.length < 2) return { ok: false, error: "Type at least 2 letters of the name." };
     builder = builder.or(`first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`);
   }
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TriangleAlertIcon } from "lucide-react";
 import { AccountDialog } from "@/components/accounts/account-dialog";
-import { ActiveToggleButton, ReassignFacilitator, ResendInviteButton } from "@/components/accounts/row-actions";
+import { ActiveToggleButton, ReassignFacilitator, ResendInviteButton, ResetTwoStepButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { Field, SubmitButton } from "@/components/forms";
 import { EmptyState, PageHeader } from "@/components/page-header";
@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/auth";
 import { courseLabel } from "@/lib/course";
 import { getActivePrograms } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
+import { searchTerm } from "@/lib/postgrest";
 import { fullName, type Profile } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Students" };
@@ -33,7 +34,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
     .limit(300);
   if (pendingOnly) query = query.is("invitation_accepted_at", null).eq("is_active", true);
   if (q) {
-    const safe = q.replace(/[,()%*]/g, " ");
+    const safe = searchTerm(q);
     query = query.or(`first_name.ilike.%${safe}%,last_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`);
   }
 
@@ -132,6 +133,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
                         {isPending(s) ? <ResendInviteButton profileId={s.id} /> : null}
+                        {s.mfa_enabled ? <ResetTwoStepButton profileId={s.id} name={fullName(s)} /> : null}
                         <ActiveToggleButton profileId={s.id} active={s.is_active} />
                       </div>
                     </TableCell>

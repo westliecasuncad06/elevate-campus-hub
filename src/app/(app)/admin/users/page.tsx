@@ -3,7 +3,7 @@ import { AccountDialog } from "@/components/accounts/account-dialog";
 import { DeleteUserButton } from "@/components/accounts/delete-user-dialog";
 import { EditUserDialog } from "@/components/accounts/edit-user-dialog";
 import { InviteStaffDialog } from "@/components/accounts/invite-staff-dialog";
-import { ActiveToggleButton, ResendInviteButton, ResetPasswordButton } from "@/components/accounts/row-actions";
+import { ActiveToggleButton, ResendInviteButton, ResetPasswordButton, ResetTwoStepButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { FormSelect, SubmitButton } from "@/components/forms";
 import { Field } from "@/components/forms";
@@ -14,6 +14,7 @@ import { courseLabel } from "@/lib/course";
 import { ROLE_LABEL } from "@/lib/roles";
 import { getActiveProgramsByCampus } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
+import { searchTerm } from "@/lib/postgrest";
 import { fullName, type Campus, type Profile } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Users" };
@@ -36,8 +37,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
   if (role !== "all") query = query.eq("role", role);
   if (campus !== "all") query = query.eq("campus_id", campus);
   if (q) {
-    // Strip characters that have meaning inside a PostgREST filter expression.
-    const safe = q.replace(/[,()%*]/g, " ");
+    // Cleaned first: commas, brackets and quotes have meaning inside a filter expression.
+    const safe = searchTerm(q);
     query = query.or(`first_name.ilike.%${safe}%,last_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`);
   }
   const { data } = await query;
@@ -164,6 +165,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                         />
                         {isPending(p) ? <ResendInviteButton profileId={p.id} /> : null}
                         <ResetPasswordButton profileId={p.id} name={fullName(p)} />
+                        {p.mfa_enabled && p.id !== actor.id ? <ResetTwoStepButton profileId={p.id} name={fullName(p)} /> : null}
                         {p.id !== actor.id ? <ActiveToggleButton profileId={p.id} active={p.is_active} /> : null}
                         {p.id !== actor.id && p.role !== "super_admin" ? (
                           <DeleteUserButton profileId={p.id} name={fullName(p)} role={p.role} />

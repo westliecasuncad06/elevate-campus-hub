@@ -97,11 +97,11 @@ export function SetPasswordForm({
         name="password"
         type="password"
         autoComplete="new-password"
-        minLength={8}
+        minLength={10}
         hint={
           passwordOptional
-            ? "Leave empty to sign in with Google only. Add one (at least 8 characters) if you also want to sign in with your email."
-            : "At least 8 characters."
+            ? "Leave empty to sign in with Google only. Add one (at least 10 characters) if you also want to sign in with your email."
+            : "At least 10 characters."
         }
         required={!passwordOptional}
         autoFocus={!needsDetails}
@@ -111,7 +111,7 @@ export function SetPasswordForm({
         name="confirm"
         type="password"
         autoComplete="new-password"
-        minLength={8}
+        minLength={10}
         required={!passwordOptional}
       />
       {needsPrivacy ? <PrivacyConsent role={role} mode="self" /> : null}

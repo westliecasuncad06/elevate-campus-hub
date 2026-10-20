@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useFormAction } from "@/components/use-form-action";
-import { KeyRoundIcon, MailIcon } from "lucide-react";
+import { KeyRoundIcon, MailIcon, ShieldOffIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
   reassignFacilitatorAction,
   resendInvitationAction,
   resetPasswordAction,
+  resetTwoStepAction,
   setActiveAction,
 } from "@/app/actions/accounts";
 import type { ActionResult } from "@/lib/types";
@@ -59,6 +60,46 @@ export function ActiveToggleButton({ profileId, active }: { profileId: string; a
     >
       {active ? "Deactivate" : "Activate"}
     </Button>
+  );
+}
+
+/** Super Admin / Campus Head: remove someone's two-step verification (they lost their phone). Asks first. */
+export function ResetTwoStepButton({ profileId, name }: { profileId: string; name: string }) {
+  const { pending, run } = useRunAction();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <ShieldOffIcon />
+        Reset 2-step
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset two-step verification for {name}?</DialogTitle>
+            <DialogDescription>
+              Use this when they lost the phone with their authenticator app. They can then sign in with just their password,
+              and turn two-step verification on again from Account &amp; security. Only do it after you are sure it really is them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => {
+                run(() => resetTwoStepAction(profileId));
+                setOpen(false);
+              }}
+            >
+              {pending ? "Resetting…" : "Reset 2-step"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -109,7 +150,7 @@ function ResetPasswordForm({ profileId, name, onDone }: { profileId: string; nam
           they sign in.
         </DialogDescription>
       </DialogHeader>
-      <Field label="Temporary password" name="password" type="text" autoComplete="off" minLength={8} required />
+      <Field label="Temporary password" name="password" type="text" autoComplete="off" minLength={10} required />
       <FormMessage state={state?.ok ? null : state} />
       <DialogFooter>
         <SubmitButton pending={pending} pendingText="Resetting…">

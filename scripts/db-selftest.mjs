@@ -17,6 +17,9 @@ await db.exec(`
   create role service_role nologin bypassrls;
   create schema auth;
   create table auth.users (id uuid primary key, email text);
+  create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, factor_type text, status text);
+  create function auth.jwt() returns jsonb language sql stable
+    as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb) $$;
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create publication supabase_realtime;
@@ -302,6 +305,75 @@ check("a finished batch can't be reopened by editing the table", !r.rows?.length
 
   await q("delete from public.profiles where id = $1", [claimer]);
   check("deleting the linked account frees the roster name", (await q("select claimed_by from public.roster_students where id = $1", [rosterId]))[0].claimed_by === null);
+}
+
+// Security hardening (migration 0017): rate limits, and two-step verification enforced by the database itself
+{
+  console.log("\nRate limits");
+  const hit = async (key, limit = 3, window = 60) => (await q("select * from public.rate_limit_hit($1, $2, $3)", [key, limit, window]))[0];
+
+  const results = [];
+  for (let i = 0; i < 5; i++) results.push((await hit("t:a")).allowed);
+  check("the first attempts are allowed, then it blocks (limit 3)", results.join() === "true,true,true,false,false", results.join());
+  const blocked = await hit("t:a");
+  check("a blocked attempt says how long to wait", blocked.allowed === false && blocked.retry_after > 0 && blocked.retry_after <= 60, JSON.stringify(blocked));
+  check("another key is counted separately", (await hit("t:b")).allowed === true);
+  // A lock that starts at the attempt reaching the limit: 2 tries allowed, the window is 2s, the 2nd try restarts it.
+  const lockHit = async () => (await q("select * from public.rate_limit_hit('t:lock', 2, 2, true)"))[0];
+  await lockHit();
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  const second = await lockHit();
+  const third = await lockHit();
+  check("a lock counts its full time from the attempt that reaches the limit", second.allowed === true && third.allowed === false && third.retry_after >= 2, JSON.stringify([second, third]));
+  await q("select public.rate_limit_reset('t:a')");
+  check("resetting a key lets it try again", (await hit("t:a")).allowed === true);
+  await hit("t:r"); await hit("t:r");
+  await q("select public.rate_limit_refund('t:r')");
+  check("refunding takes one attempt back (never below zero)", (await hit("t:r")).hits === 2 && (await q("select public.rate_limit_refund('t:nothing')")).length === 1);
+  await hit("t:w", 1, 1);
+  await hit("t:w", 1, 1); // over the limit
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  const fresh = await hit("t:w", 1, 1);
+  check("the count starts over when the window has passed", fresh.allowed === true && fresh.hits === 1, JSON.stringify(fresh));
+  await q("insert into public.rate_limits (key, window_start, hits) values ('t:old', now() - interval '3 days', 9)");
+  check("cleanup removes old counters and keeps recent ones", (await q("select public.rate_limits_cleanup() n"))[0].n >= 1 && (await q("select count(*)::int n from public.rate_limits where key = 't:a'"))[0].n === 1);
+  for (const [who, label] of [[stuM, "a signed-in user"], [head1, "a Campus Head"]]) {
+    check(`${label} can't use the limiter or read the counters`, !!(await asUser(who, () => tryQ("select * from public.rate_limit_hit('x', 1, 1)"))).error && !!(await asUser(who, () => tryQ("select * from public.rate_limits"))).error);
+  }
+  check("anonymous callers can't either", !!(await (async () => { await db.exec("reset role; set role anon;"); const x = await tryQ("select * from public.rate_limit_hit('x', 1, 1)"); await db.exec("reset role"); return x; })()).error);
+
+  console.log("\nTwo-step verification");
+  const claims = (sub, extra = {}) => JSON.stringify({ sub, aal: "aal1", amr: [{ method: "password", timestamp: 1 }], ...extra });
+  const asClaims = async (sub, json, fn) => {
+    await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${sub}', false); select set_config('request.jwt.claims', '${json.replace(/'/g, "''")}', false); set role authenticated;`);
+    try { return await fn(); } finally { await db.exec("reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claims', '', false);"); }
+  };
+  const guarded = (sub, json) => asClaims(sub, json, () => tryQ("select public.enforce_mfa()"));
+
+  // stuM has no authenticator factor yet
+  check("nobody is held back while two-step is off", !(await guarded(stuM, claims(stuM))).error);
+  await q("insert into auth.mfa_factors (user_id, factor_type, status) values ($1, 'totp', 'unverified')", [stuM]);
+  check("a factor that was never verified doesn't count", !(await guarded(stuM, claims(stuM))).error);
+  await q("update auth.mfa_factors set status = 'verified' where user_id = $1", [stuM]);
+  const pw = await guarded(stuM, claims(stuM));
+  check("a password-only session is refused once two-step is on (API error PT403)", !!pw.error && /Two-step/.test(pw.error), pw.error ?? "allowed");
+  check("a session that passed the second step (aal2) is allowed", !(await guarded(stuM, claims(stuM, { aal: "aal2" }))).error);
+  check("a Google sign-in session is allowed (the easy login)", !(await guarded(stuM, claims(stuM, { amr: [{ method: "oauth", timestamp: 1 }] }))).error);
+  check("an old password session that ALSO has 'oauth' in its history is allowed only because Google signed in", !(await guarded(stuM, claims(stuM, { amr: [{ method: "password", timestamp: 1 }, { method: "oauth", timestamp: 2 }] }))).error);
+  check("a token with no claims at all is treated as password-only", !!(await asClaims(stuM, "{}", () => tryQ("select public.enforce_mfa()"))).error);
+  check("other people are unaffected", !(await guarded(facM, claims(facM))).error);
+  check("signed-out and service-role requests pass (no user id)", !(await tryQ("select public.enforce_mfa()")).error);
+  check("mfa_ok() says no to a password-only session and yes to aal2", (await asClaims(stuM, claims(stuM), () => q("select public.mfa_ok() ok")))[0].ok === false && (await asClaims(stuM, claims(stuM, { aal: "aal2" }), () => q("select public.mfa_ok() ok")))[0].ok === true);
+
+  // Realtime goes around the API hook, so the broadcast tables also carry a restrictive policy.
+  const before = (await q("select count(*)::int n from public.notifications where recipient_id = $1", [stuM]))[0].n;
+  await q("select public.notify($1, 'system', 'Hello', 'Body', '/student')", [stuM]);
+  check("their notifications are visible with the second step done", (await asClaims(stuM, claims(stuM, { aal: "aal2" }), () => q("select id from public.notifications"))).length === before + 1);
+  check("...and hidden from a password-only session (Realtime / direct reads)", (await asClaims(stuM, claims(stuM), () => q("select id from public.notifications"))).length === 0);
+  check("...but visible to a Google session", (await asClaims(stuM, claims(stuM, { amr: [{ method: "oauth", timestamp: 1 }] }), () => q("select id from public.notifications"))).length === before + 1);
+  check("the restrictive policies exist on the broadcast tables", (await q("select count(*)::int n from pg_policies where policyname in ('chat_messages_mfa_required','notifications_mfa_required') and permissive = 'RESTRICTIVE'"))[0].n === 2);
+  await q("delete from auth.mfa_factors where user_id = $1", [stuM]);
+  await q("delete from public.notifications where recipient_id = $1 and title = 'Hello'", [stuM]);
 }
 
 const totals = (await asUser(head1, () => q("select * from public.compute_daily_report($1, $2::date)", [c1, todayManila])))[0];

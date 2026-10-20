@@ -14,6 +14,7 @@ const NOTICES: Record<string, string> = {
   google_not_invited:
     "That Google account hasn't been invited yet. Ask your Campus Head to invite the email you use with Google, or sign in with your email and password.",
   google_failed: "Google sign-in didn't finish. Try again, or sign in with your email and password.",
+  too_many: "Too many attempts from this connection. Please wait a few minutes and try again.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {

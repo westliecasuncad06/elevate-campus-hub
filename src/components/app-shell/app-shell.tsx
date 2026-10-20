@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { EllipsisIcon, KeyRoundIcon, LogOutIcon } from "lucide-react";
+import { EllipsisIcon, KeyRoundIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { AddBatchButton } from "@/components/batch/add-batch-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -126,7 +126,7 @@ export function AppShell({
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Phones get a bottom bar: up to 4 destinations plus an always-present "More" sheet that
-  // holds the remaining destinations, Change password and Sign out.
+  // holds the remaining destinations, Account & security and Sign out.
   const bottomItems = items.slice(0, 4);
   const overflowItems = items.slice(4);
 
@@ -164,11 +164,11 @@ export function AppShell({
         </nav>
         <div className="mt-auto grid gap-1 border-t border-sidebar-border pt-3">
           <Link
-            href="/set-password"
+            href="/account"
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
           >
-            <KeyRoundIcon className="size-4" />
-            Change password
+            <ShieldCheckIcon className="size-4" />
+            Account & security
           </Link>
           <SignOutForm />
         </div>
@@ -267,12 +267,12 @@ export function AppShell({
               All notifications
             </Link>
             <Link
-              href="/set-password"
+              href="/account"
               onClick={() => setMoreOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-white/80 hover:bg-white/10"
             >
-              <KeyRoundIcon className="size-4" />
-              Change password
+              <ShieldCheckIcon className="size-4" />
+              Account & security
             </Link>
             <SignOutForm className="py-3" />
           </div>

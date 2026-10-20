@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { PrivacyNotice } from "@/components/privacy/privacy-notice";
-import { getSessionProfile } from "@/lib/auth";
+import { getSessionProfile, requireMfaStep } from "@/lib/auth";
 import { PRIVACY_VERSION } from "@/lib/privacy";
 import { ROLE_HOME } from "@/lib/roles";
 import { AcceptPrivacyForm } from "./accept-form";
@@ -11,6 +11,7 @@ export const metadata: Metadata = { title: "Data Privacy Notice" };
 
 /** Shown once to anyone who hasn't accepted the current notice yet (existing accounts, or after the notice changes). */
 export default async function AcceptPrivacyPage() {
+  await requireMfaStep();
   const profile = await getSessionProfile();
   if (!profile) redirect("/auth/signout?reason=no_profile");
   if (!profile.password_changed) redirect("/set-password");

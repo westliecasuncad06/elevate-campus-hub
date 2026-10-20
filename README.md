@@ -85,6 +85,16 @@ sheet's colour, and existing accounts with a matching name are linked and get th
 Students can change their own **year level** from **My card**; every other detail is changed by their facilitator or Campus Head.
 Names typed in capitals by accident ("JARDIN") are saved as "Jardin" everywhere a name is entered.
 
+### Security and two-step verification
+
+See [SECURITY.md](SECURITY.md) for everything in one place. In short: **4 wrong passwords make the next try wait 60 seconds** (longer limits catch slow guessing, and a
+correct password never counts against anyone), bots are caught by a hidden field and an optional free Cloudflare Turnstile check, new passwords need
+10+ characters and can't be common, every page carries a strict Content-Security-Policy, and every database query is parameterised (no SQL injection).
+
+Everyone can turn on **two-step verification** under **Account & security** (side menu, or **More** on a phone): after the password, a 6-digit code from an
+authenticator app. The database itself refuses a password-only session of someone who turned it on, so it can't be bypassed. **Continue with Google stays the easy
+login** and is not asked for the code. Lost phone: the Super Admin (anyone) or the Campus Head (their people) presses **Reset 2-step** next to the name.
+
 ### Signing in with Google
 
 The sign-in page also has **Continue with Google**, so people don't have to remember a password. It appears by itself once the

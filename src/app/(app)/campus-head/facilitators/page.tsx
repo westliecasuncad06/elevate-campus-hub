@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { InviteStaffDialog } from "@/components/accounts/invite-staff-dialog";
-import { ActiveToggleButton, ResendInviteButton } from "@/components/accounts/row-actions";
+import { ActiveToggleButton, ResendInviteButton, ResetTwoStepButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -121,6 +121,7 @@ export default async function FacilitatorsPage() {
                       ) : (
                         <div className="flex flex-wrap justify-end gap-2">
                           {isPending(f) ? <ResendInviteButton profileId={f.id} /> : null}
+                          {f.mfa_enabled ? <ResetTwoStepButton profileId={f.id} name={fullName(f)} /> : null}
                           <ActiveToggleButton profileId={f.id} active={f.is_active} />
                         </div>
                       )}

@@ -23,11 +23,18 @@ export async function GET(request: NextRequest) {
   // Housekeeping while we're here: notifications older than 60 days aren't useful any more.
   const cutoff = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const { error: cleanupError } = await admin.from("notifications").delete().lt("created_at", cutoff);
+  // Old sign-in attempt counters (rate limits) are of no use once their window has passed.
+  const { data: limitsRemoved, error: limitsError } = await admin.rpc("rate_limits_cleanup");
 
   await admin.from("system_logs").insert({
     event: "keep_alive",
     level: "info",
-    detail: { source: "cron", ...(cleanupError ? { cleanup_error: cleanupError.message } : {}) },
+    detail: {
+      source: "cron",
+      rate_limit_rows_removed: typeof limitsRemoved === "number" ? limitsRemoved : null,
+      ...(cleanupError ? { cleanup_error: cleanupError.message } : {}),
+      ...(limitsError ? { rate_limit_cleanup_error: limitsError.message } : {}),
+    },
   });
   return NextResponse.json({ ok: true, at: new Date().toISOString() });
 }

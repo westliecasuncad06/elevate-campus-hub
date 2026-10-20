@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { searchTerm } from "@/lib/postgrest";
 import { fullName } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Roster" };
@@ -48,7 +49,7 @@ export default async function RosterPage({ searchParams }: PageProps<"/campus-he
     .limit(500);
   if (filter === "waiting") query = query.is("claimed_by", null);
   if (filter === "registered") query = query.not("claimed_by", "is", null);
-  if (q) query = query.ilike("full_name", `%${q.replace(/[%,()*]/g, " ")}%`);
+  if (searchTerm(q)) query = query.ilike("full_name", `%${searchTerm(q)}%`);
   const { data } = await query;
   const rows = (data ?? []) as unknown as RosterRow[];
 

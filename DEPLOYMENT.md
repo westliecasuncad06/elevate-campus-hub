@@ -27,6 +27,8 @@ Nothing else is needed.
 | `CRON_SECRET` | a long random string (32+ chars) | the keep-alive job checks it |
 | `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` | the Apps Script web app URL | only for the "Send to a Google Doc" report; the Google Form needs no variable |
 | `NEXT_PUBLIC_PRIVACY_CONTACT` | e.g. `dpo@yourchurch.org` | optional; shown in the Data Privacy Notice |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` | from Cloudflare Turnstile (free) | optional bot check on sign-in/register; set **both** (mark the secret *Sensitive*). See [SECURITY.md](SECURITY.md) |
+| `RATE_LIMIT_SECRET` | a long random text | optional; keys the sign-in attempt counters |
 
 Do **not** add `SUPABASE_DB_URL`, `SEED_*` or `DEMO_*`: they are only for your own computer.
 `NEXT_PUBLIC_*` values are baked into the build, so after changing one you must **Redeploy**.
@@ -117,6 +119,8 @@ area. Someone who has not registered yet is asked for their details and the priv
 4. Try the scanner on a real phone (the camera needs the https address).
 
 ## 5. Before real students use it
+
+- [ ] Read [SECURITY.md](SECURITY.md) and do its **Switch on** list (Supabase sign-up off, Turnstile, Vercel Bot Protection, two-step for the Super Admin and Campus Heads, a second Super Admin).
 
 - [ ] Remove the demo accounts (`demo.*@example.test`): Super Admin → Users → Deactivate, or delete them in Supabase.
 - [ ] Change the database password (Supabase → Project Settings → Database) and update `SUPABASE_DB_URL` locally.

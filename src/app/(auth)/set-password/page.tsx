@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
-import { getSessionProfile, isGoogleSession } from "@/lib/auth";
+import { getSessionProfile, isGoogleSession, requireMfaStep } from "@/lib/auth";
 import { PRIVACY_VERSION } from "@/lib/privacy";
 import { getActivePrograms } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +10,7 @@ import { SetPasswordForm } from "./set-password-form";
 export const metadata: Metadata = { title: "Choose your password" };
 
 export default async function SetPasswordPage() {
+  await requireMfaStep();
   const profile = await getSessionProfile();
   if (!profile) redirect("/auth/signout?reason=no_profile");
 
