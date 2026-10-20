@@ -59,8 +59,10 @@ export async function createAccountAction(
 }
 
 /**
- * Invite a Campus Head or facilitator with just their email. They get a 6-digit code, register themselves and fill in
- * their own details. (Students are still registered with their details by a facilitator or Campus Head.)
+ * Invite someone with just their email. They get a 6-digit code, register themselves and fill in their own details.
+ * A Campus Head or facilitator can be invited this way by the Super Admin (and a Campus Head can invite facilitators);
+ * a STUDENT can only be invited this way by the Super Admin. Facilitators and Campus Heads still register students with
+ * their details.
  */
 export async function inviteStaffAction(
   role: Role,
@@ -68,9 +70,10 @@ export async function inviteStaffAction(
   formData: FormData,
 ): Promise<ActionResult> {
   const actor = await getActor("super_admin", "campus_head");
-  if (!actor || (role !== "campus_head" && role !== "facilitator") || !creatableRoles(actor.role).includes(role)) {
+  if (!actor || (role !== "campus_head" && role !== "facilitator" && role !== "student") || !creatableRoles(actor.role).includes(role)) {
     return FORBIDDEN;
   }
+  if (role === "student" && actor.role !== "super_admin") return FORBIDDEN;
 
   const campusId = resolveCampusId(actor, formData);
   if (!campusId) return { ok: false, error: "Select a campus." };

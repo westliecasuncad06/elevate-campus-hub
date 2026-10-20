@@ -106,6 +106,8 @@ export interface SheetRow extends StudentStats {
   yearLevel: number | null;
   facilitatorId: string | null;
   facilitator: string | null;
+  /** On the campus roster but without an account yet: their attendance comes from the campus's own sheet. */
+  rosterOnly?: boolean;
 }
 
 export interface SheetSummary {

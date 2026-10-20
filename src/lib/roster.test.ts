@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { displayName, nameKey, nameKeyFor, parseCsv, parseGender, parseRosterSheet, parseYearAndCourse } from "./roster";
+import {
+  displayName,
+  markFromColour,
+  nameKey,
+  nameKeyFor,
+  normalizeColour,
+  parseCsv,
+  parseGender,
+  parseRosterSheet,
+  parseSheetAttendance,
+  parseSheetHtml,
+  parseYearAndCourse,
+  sheetDateToIso,
+} from "./roster";
 
 describe("nameKey", () => {
   it("is the same however the name is written", () => {
@@ -126,5 +139,98 @@ describe("parseRosterSheet", () => {
     const bad = parseRosterSheet("Student,Sex\nAna Cruz,F");
     expect(bad.rows).toEqual([]);
     expect(bad.skipped[0].reason).toMatch(/Name/);
+  });
+});
+
+describe("normalizeColour", () => {
+  it("reads hex and rgb colours", () => {
+    expect(normalizeColour("#00FF00")).toBe("#00ff00");
+    expect(normalizeColour("#0f0")).toBe("#00ff00");
+    expect(normalizeColour(" rgb(255, 0, 0) ")).toBe("#ff0000");
+    expect(normalizeColour("white")).toBe("");
+    expect(normalizeColour("")).toBe("");
+  });
+});
+
+describe("markFromColour", () => {
+  it("green is present and red is absent", () => {
+    expect(markFromColour("#00ff00")).toBe("present");
+    expect(markFromColour("#ff0000")).toBe("absent");
+    expect(markFromColour("rgb(0,255,0)")).toBe("present");
+  });
+
+  it("other colours mean nothing", () => {
+    for (const colour of ["#ffffff", "#cccccc", "#ffff00", "#ffe599", "#c9daf8", "#00ffff", "#b6d7a8", ""]) {
+      expect(markFromColour(colour)).toBeNull();
+    }
+  });
+});
+
+describe("sheetDateToIso", () => {
+  it("reads the sheet's m/d/yy dates", () => {
+    expect(sheetDateToIso("9/18/26")).toBe("2026-09-18");
+    expect(sheetDateToIso("10/2/26")).toBe("2026-10-02");
+    expect(sheetDateToIso("10/16/2026")).toBe("2026-10-16");
+  });
+
+  it("rejects anything else", () => {
+    expect(sheetDateToIso("Name")).toBeNull();
+    expect(sheetDateToIso("2/30/26")).toBeNull();
+    expect(sheetDateToIso("")).toBeNull();
+  });
+});
+
+const HTML = `
+<style>.ritz .waffle .s0{background-color:#00ffff;}.ritz .waffle .s9{background-color:#ff0000;}.ritz .waffle .s10{background-color:#00ff00;}
+.ritz .waffle .s6{background-color:#cccccc;}.ritz .waffle .s8{background-color:#ffffff;}</style>
+<table><tbody>
+<tr style="height: 20px"><th class="row-headers-background">1</th><td class="s0" colspan="3">GRC ATTENDANCE</td><td class="s6" colspan="2">DATE</td></tr>
+<tr><th>2</th><td>Name</td><td>Gender</td><td>Year Level / Course</td><td class="s6">9/18/26</td><td class="s6">9/25/26</td></tr>
+<tr><th>3</th><td class="s8">Abordo, Irish Nicole</td><td class="s8">Female</td><td></td><td class="s9"></td><td class="s10"></td></tr>
+<tr><th>4</th><td class="s8">Aisa Doon</td><td class="s8">Female</td><td class="s8">2nd Year / BSBA</td><td class="s10"></td><td></td></tr>
+<tr><th>5</th><td class="s8">Bernard Gonzales</td><td>Male</td><td></td><td class="s9"></td><td class="s9"></td></tr>
+<tr><th>6</th><td class="s8">Gonzales Bernard</td><td>Male</td><td></td><td class="s10"></td><td></td></tr>
+<tr><th>7</th><td class="s8">Madonna</td><td></td><td></td><td class="s10"></td><td class="s10"></td></tr>
+</tbody></table>`;
+
+describe("parseSheetHtml", () => {
+  const grid = parseSheetHtml(HTML);
+
+  it("reads the cells of each row, repeating merged cells and skipping the row numbers", () => {
+    expect(grid).toHaveLength(7);
+    expect(grid[0].map((c) => c.text)).toEqual(["GRC ATTENDANCE", "GRC ATTENDANCE", "GRC ATTENDANCE", "DATE", "DATE"]);
+    expect(grid[2][0].text).toBe("Abordo, Irish Nicole");
+  });
+
+  it("reads each cell's background colour from its class", () => {
+    expect(grid[2][3].bg).toBe("#ff0000");
+    expect(grid[2][4].bg).toBe("#00ff00");
+    expect(grid[3][4].bg).toBe("");
+  });
+});
+
+describe("parseSheetAttendance", () => {
+  const result = parseSheetAttendance(HTML);
+
+  it("finds the date columns", () => {
+    expect(result.dates).toEqual(["2026-09-18", "2026-09-25"]);
+  });
+
+  it("reads green as present and red as absent, per person", () => {
+    const abordo = result.people.find((p) => p.name === "Irish Nicole Abordo");
+    expect(abordo?.marks).toEqual({ "2026-09-18": "absent", "2026-09-25": "present" });
+    const aisa = result.people.find((p) => p.name === "Aisa Doon");
+    expect(aisa?.marks).toEqual({ "2026-09-18": "present" });
+  });
+
+  it("merges a name written twice, and green wins", () => {
+    const bernard = result.people.filter((p) => p.nameKey === nameKey("Bernard Gonzales"));
+    expect(bernard).toHaveLength(1);
+    expect(bernard[0].marks).toEqual({ "2026-09-18": "present", "2026-09-25": "absent" });
+  });
+
+  it("ignores a one-word name, and a sheet with no header", () => {
+    expect(result.people.some((p) => p.name === "Madonna")).toBe(false);
+    expect(parseSheetAttendance("<table><tr><td>x</td></tr></table>")).toEqual({ dates: [], people: [] });
   });
 });

@@ -62,6 +62,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
           <>
             <InviteStaffDialog role="campus_head" campuses={campusOptions} />
             <InviteStaffDialog role="facilitator" campuses={campusOptions} />
+            <InviteStaffDialog role="student" campuses={campusOptions} />
             <AccountDialog role="student" programsByCampus={programsByCampus} campuses={campusOptions} />
           </>
         }

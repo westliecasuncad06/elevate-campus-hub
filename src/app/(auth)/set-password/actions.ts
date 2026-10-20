@@ -5,10 +5,13 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCampus, getSessionProfile, isGoogleSession } from "@/lib/auth";
+import { usesProgramList } from "@/lib/course";
 import { todayInTimezone } from "@/lib/dates";
 import { PRIVACY_VERSION } from "@/lib/privacy";
+import { getActivePrograms } from "@/lib/queries";
 import { ROLE_HOME } from "@/lib/roles";
-import { parseAccountForm } from "@/lib/validation";
+import { claimRosterName } from "@/lib/roster-claim";
+import { parseAccountForm, type AccountFields } from "@/lib/validation";
 import type { ActionResult } from "@/lib/types";
 
 export async function setPassword(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
@@ -33,15 +36,23 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
   // Invited by email only: this is where they tell us who they are. The same checks as when someone else registers them
   // (names, phone, a facilitator's gender, a sensible birthday), minus the consent tick: they accept the notice above.
   const admin = createAdminClient();
-  let details: { firstName: string; lastName: string; phone: string | null; gender: string | null; birthday: string | null } | null = null;
+  let details: AccountFields | null = null;
   if (!profile.details_complete) {
     const own = new FormData();
     for (const [key, value] of formData.entries()) own.set(key, value);
     own.set("email", profile.email); // never taken from the form: it is the address they signed in with
     const campus = await getCampus(profile.campus_id);
-    const parsed = parseAccountForm(profile.role, own, todayInTimezone(campus?.timezone), { requireConsent: false });
+    // A student at a campus with its own programs picks one; at any other campus they type their course.
+    const programs = profile.role === "student" ? await getActivePrograms(await createClient(), profile.campus_id) : [];
+    const parsed = parseAccountForm(profile.role, own, todayInTimezone(campus?.timezone), {
+      requireConsent: false,
+      courseMode: usesProgramList(programs) ? "program" : "text",
+    });
     if (!parsed.ok) return parsed;
     details = parsed.value;
+    if (details.programId && !programs.some((p) => p.id === details!.programId)) {
+      return { ok: false, error: "That program isn't available for your campus." };
+    }
 
     if (details.phone && profile.campus_id) {
       const { data: phoneTaken } = await admin
@@ -83,6 +94,16 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
             phone: details.phone,
             gender: details.gender ?? profile.gender,
             birthday: details.birthday,
+            ...(profile.role === "student"
+              ? {
+                  program_id: details.programId,
+                  course: details.course,
+                  year_level: details.yearLevel,
+                  church: details.church,
+                  religion: details.religion,
+                  student_number: details.studentNumber,
+                }
+              : {}),
             details_complete: true,
             // They gave their own details and accepted the notice in the same step.
             data_consent_at: now,
@@ -95,6 +116,12 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
   if (profileError) {
     const detail = profileError.code === "23505" ? "That phone number is already registered." : "Password saved, but your profile could not be updated. Try again.";
     return { ok: false, error: detail };
+  }
+
+  // A student who has just told us their name is matched to the campus roster: their name is linked, and the attendance
+  // already recorded for it on the campus's sheet becomes theirs.
+  if (details && profile.role === "student" && profile.campus_id) {
+    await claimRosterName(admin, profile.campus_id, profile.id, details.firstName, details.lastName);
   }
 
   redirect(ROLE_HOME[profile.role]);

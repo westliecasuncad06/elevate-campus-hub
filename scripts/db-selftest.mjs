@@ -270,6 +270,36 @@ check("a finished batch can't be reopened by editing the table", !r.rows?.length
   const second = (await q("select id from public.roster_students where campus_id = $1 and name_key = 'abordo irish nicole'", [c1]))[0].id;
   check("an account can be linked to only one roster name", !!(await tryQ("update public.roster_students set claimed_by = $1 where id = $2", [claimer, second])).error);
   check("a linked name shows who it belongs to", (await q("select claimed_by from public.roster_students where id = $1", [rosterId]))[0].claimed_by === claimer);
+
+  // Attendance kept on the roster (migration 0016): read-only from the app, and copied to the account when the name is linked
+  const mark = (rid, date, status) => tryQ("insert into public.roster_attendance (roster_id, campus_id, log_date, status) values ($1,$2,$3,$4)", [rid, c1, date, status]);
+  check("a roster mark can be saved", !(await mark(rosterId, "2026-09-18", "present")).error);
+  await mark(rosterId, "2026-09-25", "present");
+  await mark(rosterId, "2026-10-02", "absent");
+  await mark(second, "2026-09-18", "present");
+  check("one mark per name per day", !!(await mark(rosterId, "2026-09-18", "absent")).error);
+  check("a mark is present or absent only", !!(await mark(rosterId, "2026-10-09", "late")).error);
+  check("a Campus Head sees their campus's roster attendance", (await asUser(head1, () => q("select id from public.roster_attendance"))).length === 4);
+  check("another campus's head sees none of it", (await asUser(head2, () => q("select id from public.roster_attendance"))).length === 0);
+  check("the Super Admin sees it", (await asUser(admin, () => q("select id from public.roster_attendance"))).length === 4);
+  check("a facilitator and a student can't see it", (await asUser(facM, () => q("select id from public.roster_attendance"))).length === 0 && (await asUser(stuM, () => q("select id from public.roster_attendance"))).length === 0);
+  for (const [who, label] of [[head1, "a Campus Head"], [admin, "the Super Admin"], [stuM, "a student"]]) {
+    const w = await asUser(who, () => tryQ("insert into public.roster_attendance (roster_id, campus_id, log_date, status) values ($1,$2,'2026-11-06','present')", [rosterId, c1]));
+    const u = await asUser(who, () => tryQ("update public.roster_attendance set status = 'absent' where roster_id = $1 returning id", [rosterId]));
+    const d = await asUser(who, () => tryQ("delete from public.roster_attendance where roster_id = $1 returning id", [rosterId]));
+    check(`${label} can't change roster attendance directly`, !!w.error && !!u.error && !!d.error, "a write was allowed");
+  }
+
+  const copied = await q("select public.import_roster_attendance($1, $2) n", [rosterId, claimer]);
+  check("linking copies only the PRESENT days into real attendance records", copied[0].n === 2 && (await q("select count(*)::int n from public.attendance_logs where student_id = $1", [claimer]))[0].n === 2, JSON.stringify(copied));
+  const copiedRows = await q("select entry_method, scanned_by, (time_in at time zone 'Asia/Manila')::time::text t, log_date::text d from public.attendance_logs where student_id = $1 order by log_date", [claimer]);
+  check("the copied records are marked as imports, at 9:00 campus time, on the sheet's dates", copiedRows.every((r) => r.entry_method === "import" && r.t === "09:00:00" && r.scanned_by === claimer) && copiedRows.map((r) => r.d).join() === "2026-09-18,2026-09-25", JSON.stringify(copiedRows));
+  check("running it again adds nothing", (await q("select public.import_roster_attendance($1, $2) n", [rosterId, claimer]))[0].n === 0);
+  check("it copies nothing for an account the name is NOT linked to", (await q("select public.import_roster_attendance($1, $2) n", [second, claimer]))[0].n === 0);
+  check("a student can't call it", !!(await asUser(stuM, () => tryQ("select public.import_roster_attendance($1, $2)", [rosterId, stuM]))).error);
+  check("a Campus Head can't call it", !!(await asUser(head1, () => tryQ("select public.import_roster_attendance($1, $2)", [rosterId, claimer]))).error);
+  check("'import' is a valid way to be recorded, but a made-up one isn't", !(await tryQ("select 1 where 'import' in ('qr','phone','email','manual','import')")).error && !!(await tryQ("insert into public.attendance_logs (campus_id, student_id, log_date, scanned_by, entry_method) values ($1,$2,'2026-10-09',$2,'bogus')", [c1, claimer])).error);
+
   await q("delete from public.profiles where id = $1", [claimer]);
   check("deleting the linked account frees the roster name", (await q("select claimed_by from public.roster_students where id = $1", [rosterId]))[0].claimed_by === null);
 }

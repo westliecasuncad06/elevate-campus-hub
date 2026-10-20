@@ -132,6 +132,7 @@ export function AttendanceSheet({
       if (year !== ALL && String(r.yearLevel) !== year) return false;
       if (facilitator === "none" ? r.facilitatorId !== null : facilitator !== ALL && r.facilitatorId !== facilitator) return false;
       if (status === "at-risk") return r.atRisk;
+      if (status === "roster") return r.rosterOnly === true;
       if (status !== ALL && r.status !== status) return false;
       return true;
     });
@@ -155,7 +156,7 @@ export function AttendanceSheet({
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Students" value={summary.students} hint={filtering ? "Matching your filters" : "Active at your campus"} />
+        <StatCard label="Students" value={summary.students} hint={filtering ? "Matching your filters" : "Registered, plus names on your roster"} />
         <StatCard label="Sessions" value={summary.sessions} hint="Days the campus met" />
         <StatCard label="Average attendance" value={summary.averageRate === null ? "—" : `${summary.averageRate}%`} hint="Of the sessions each student could attend" />
         <StatCard label="Consistent" value={summary.consistent} hint="Attended 80% or more" />
@@ -191,6 +192,7 @@ export function AttendanceSheet({
           options={[
             { value: ALL, label: "Everyone" },
             { value: "at-risk", label: "At risk" },
+            { value: "roster", label: "No account yet" },
             ...(["consistent", "regular", "occasional", "rare", "new"] as const).map((s) => ({ value: s, label: STATUS_LABEL[s] })),
           ]}
           onValueChange={setStatus}
@@ -251,6 +253,11 @@ export function AttendanceSheet({
                 <TableRow key={r.id}>
                   <TableCell className="sticky left-0 z-10 bg-card">
                     <p className="font-medium">{r.name}</p>
+                    {r.rosterOnly ? (
+                      <Badge variant="outline" className="mt-0.5 border-transparent bg-brand/25 text-brand-ink" title="On the roster, but hasn't registered yet. Their attendance comes from your own sheet and moves to their account when they register.">
+                        No account yet
+                      </Badge>
+                    ) : null}
                     <p className="text-xs text-muted-foreground">
                       {r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "—"}
                       {r.facilitator ? ` · ${r.facilitator}` : ""}

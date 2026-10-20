@@ -68,7 +68,8 @@ export interface AttendanceLog {
   time_out: string | null;
   purpose: string | null;
   scanned_by: string;
-  entry_method: EntryMethod;
+  /** "import" = copied from the campus's own attendance sheet when the student registered (nobody scanned them). */
+  entry_method: EntryMethod | "import";
 }
 
 export interface EngagementLog {

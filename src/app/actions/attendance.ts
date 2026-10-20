@@ -95,6 +95,8 @@ export async function addToBatchByQrAction(batchId: string, token: string): Prom
     .eq("qr_token", value)
     .eq("role", "student")
     .eq("is_active", true)
+    // A student invited by email who hasn't registered yet has no name or details to record against.
+    .eq("details_complete", true)
     .maybeSingle<{ id: string }>();
   if (!student) return { ok: false, error: "No student at your campus has this QR code." };
 
@@ -129,6 +131,7 @@ export async function lookupStudentsAction(
     .select("id, first_name, last_name, phone, email, course, program:programs(code)")
     .eq("role", "student")
     .eq("is_active", true)
+    .eq("details_complete", true)
     .limit(5);
 
   let method: EntryMethod = "manual";

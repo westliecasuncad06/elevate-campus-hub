@@ -123,6 +123,143 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Attendance from the sheet's colours: green = present, red = absent. The CSV export has no colours, so this reads the
+// sheet's HTML export instead (Google Sheets → File → Download → Web page, or `export?format=zip`).
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type Mark = "present" | "absent";
+
+export interface HtmlCell {
+  text: string;
+  /** The cell's background as "#rrggbb", or "" when it has none. */
+  bg: string;
+}
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)));
+}
+
+/** "#0f0" / "#00ff00" / "rgb(0, 255, 0)" -> "#00ff00" (lower-case), or "" if it isn't a colour. */
+export function normalizeColour(value: string): string {
+  const v = value.trim().toLowerCase();
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v);
+  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
+  if (/^#[0-9a-f]{6}$/.test(v)) return v;
+  const rgb = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/.exec(v);
+  if (rgb) {
+    const hex = (n: string) => Math.min(255, Number(n)).toString(16).padStart(2, "0");
+    return `#${hex(rgb[1])}${hex(rgb[2])}${hex(rgb[3])}`;
+  }
+  return "";
+}
+
+/** Green means present and red means absent. Every other colour (white, grey header cells, yellow…) means nothing. */
+export function markFromColour(colour: string): Mark | null {
+  const hex = normalizeColour(colour);
+  if (!hex) return null;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (g >= 150 && g - r >= 40 && g - b >= 40) return "present";
+  if (r >= 150 && r - g >= 40 && r - b >= 40) return "absent";
+  return null;
+}
+
+/** Turns the first <table> of a Google Sheets HTML export into rows of cells (merged cells are repeated). */
+export function parseSheetHtml(html: string): HtmlCell[][] {
+  // .s12 { background-color: #00ff00 } -> class "s12" has that background.
+  const bgByClass = new Map<string, string>();
+  for (const rule of html.matchAll(/\.(s\d+)\s*\{([^}]*)\}/g)) {
+    const bg = /background-color\s*:\s*([^;}]+)/.exec(rule[2]);
+    if (bg) bgByClass.set(rule[1], normalizeColour(bg[1]));
+  }
+
+  const rows: HtmlCell[][] = [];
+  for (const rowMatch of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)) {
+    const cells: HtmlCell[] = [];
+    // Only <td>: the grey row-number cells at the left of each row are <th>.
+    for (const cellMatch of rowMatch[1].matchAll(/<td\b([^>]*)>([\s\S]*?)<\/td>/g)) {
+      const attrs = cellMatch[1];
+      const classes = (/class\s*=\s*"([^"]*)"/.exec(attrs)?.[1] ?? "").split(/\s+/);
+      const inline = /style\s*=\s*"[^"]*background-color\s*:\s*([^;"]+)/.exec(attrs)?.[1];
+      let bg = inline ? normalizeColour(inline) : "";
+      if (!bg) for (const c of classes) if (bgByClass.get(c)) bg = bgByClass.get(c)!;
+      const span = Math.min(Number(/colspan\s*=\s*"(\d+)"/.exec(attrs)?.[1] ?? 1) || 1, 100);
+      const text = decodeEntities(cellMatch[2].replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+      for (let i = 0; i < span; i++) cells.push({ text, bg });
+    }
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/** "9/18/26" or "9/18/2026" -> "2026-09-18"; null when it isn't a date. */
+export function sheetDateToIso(text: string): string | null {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(text.trim());
+  if (!m) return null;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  const year = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+export interface PersonAttendance {
+  name: string;
+  nameKey: string;
+  /** Only the days that are coloured green or red. */
+  marks: Record<string, Mark>;
+}
+
+export interface SheetAttendance {
+  /** The date columns found in the header, oldest first. */
+  dates: string[];
+  people: PersonAttendance[];
+}
+
+/**
+ * Reads who was present (green) or absent (red) on each date column. Finds the header row ("Name" in the first
+ * column, then dates), and reads every row below it. The same person listed twice becomes one: if either row is
+ * green that day, they were present.
+ */
+export function parseSheetAttendance(html: string): SheetAttendance {
+  const grid = parseSheetHtml(html);
+  const headerAt = grid.findIndex((row) => (row[0]?.text ?? "").toLowerCase() === "name");
+  if (headerAt < 0) return { dates: [], people: [] };
+
+  const columns: { at: number; date: string }[] = [];
+  grid[headerAt].forEach((cell, at) => {
+    const date = sheetDateToIso(cell.text);
+    if (date) columns.push({ at, date });
+  });
+
+  const byKey = new Map<string, PersonAttendance>();
+  for (const row of grid.slice(headerAt + 1)) {
+    const name = row[0]?.text ?? "";
+    const key = nameKey(name);
+    if (!name || nameWords(name).length < 2) continue;
+
+    const person = byKey.get(key) ?? { name: displayName(name), nameKey: key, marks: {} };
+    for (const { at, date } of columns) {
+      const mark = markFromColour(row[at]?.bg ?? "");
+      if (!mark) continue;
+      // A green mark on either row of a doubled name wins.
+      if (mark === "present" || !person.marks[date]) person.marks[date] = mark;
+    }
+    byKey.set(key, person);
+  }
+  return { dates: columns.map((c) => c.date).sort(), people: [...byKey.values()] };
+}
+
 export interface RosterImport {
   rows: RosterRow[];
   /** The same name listed twice: only the first is kept (the later one only fills in what was blank). */

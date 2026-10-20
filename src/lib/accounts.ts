@@ -131,11 +131,12 @@ export async function createAccount(params: {
 }
 
 /**
- * Invites a Campus Head or facilitator with ONLY their email. They register themselves with the 6-digit code in the
- * email, and fill in their own name, gender and the rest then (`details_complete` stays false until they do).
+ * Invites a Campus Head, facilitator or (Super Admin only) student with ONLY their email. They register themselves with
+ * the 6-digit code in the email, and fill in their own name, gender and the rest then (`details_complete` stays false
+ * until they do). A student's name is matched to the campus roster at that point.
  */
 export async function inviteStaffByEmail(params: {
-  role: "campus_head" | "facilitator";
+  role: "campus_head" | "facilitator" | "student";
   campusId: string;
   email: string;
   createdBy: string;

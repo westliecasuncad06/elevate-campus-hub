@@ -30,6 +30,21 @@ interface StudentRow {
   program: { code: string } | null;
 }
 
+interface RosterEntry {
+  id: string;
+  full_name: string;
+  gender: Gender | null;
+  year_level: number | null;
+  course: string | null;
+  claimed_by: string | null;
+}
+
+interface RosterMark {
+  roster_id: string;
+  log_date: string;
+  status: "present" | "absent";
+}
+
 export interface AttendanceSheetData {
   /** Days the campus met in the range, oldest first. */
   sessions: string[];
@@ -37,7 +52,9 @@ export interface AttendanceSheetData {
 }
 
 /**
- * One row per active student in the campus, with a cell for every day the campus met between `from` and `to`.
+ * One row per active student in the campus, plus one per roster name that has no account yet, with a cell for every day
+ * the campus met between `from` and `to`. Attendance recorded on the roster (from the campus's own sheet) counts too,
+ * so a name that registers later simply carries on from the history it already had.
  * Runs as the signed-in Campus Head, so row-level security keeps it to their own campus.
  */
 export async function loadAttendanceSheet(
@@ -46,7 +63,7 @@ export async function loadAttendanceSheet(
   from: string,
   to: string,
 ): Promise<AttendanceSheetData> {
-  const [sessionRows, students, attendance, assignments, people] = await Promise.all([
+  const [sessionRows, students, attendance, assignments, people, rosterEntries, rosterMarks] = await Promise.all([
     fetchAll<unknown>((a, b) =>
       supabase.rpc("attendance_session_dates", { p_campus_id: campus.id, p_from: from, p_to: to }).range(a, b),
     ),
@@ -68,23 +85,58 @@ export async function loadAttendanceSheet(
     fetchAll<{ id: string; first_name: string; last_name: string }>((a, b) =>
       supabase.from("profiles").select("id, first_name, last_name").in("role", ["facilitator", "campus_head"]).order("id").range(a, b),
     ),
+    fetchAll<RosterEntry>((a, b) =>
+      supabase
+        .from("roster_students")
+        .select("id, full_name, gender, year_level, course, claimed_by")
+        .eq("campus_id", campus.id)
+        .order("id")
+        .range(a, b),
+    ),
+    fetchAll<RosterMark>((a, b) =>
+      supabase.from("roster_attendance").select("roster_id, log_date, status").eq("campus_id", campus.id).order("id").range(a, b),
+    ),
   ]);
 
   // `setof date` comes back as bare strings; be tolerant of an object wrapper too.
-  const sessions = sessionRows
+  const loggedSessions = sessionRows
     .map((r) => (typeof r === "string" ? r : String(Object.values(r as Record<string, unknown>)[0] ?? "")))
-    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-    .sort();
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+
+  // What the campus's own sheet says about each roster name: the days present, and the first day it has any mark for
+  // (they can't be marked absent for weeks before that).
+  const rosterHistory = new Map<string, { present: Set<string>; first: string }>();
+  for (const mark of rosterMarks) {
+    const entry = rosterHistory.get(mark.roster_id) ?? { present: new Set<string>(), first: mark.log_date };
+    if (mark.status === "present") entry.present.add(mark.log_date);
+    if (mark.log_date < entry.first) entry.first = mark.log_date;
+    rosterHistory.set(mark.roster_id, entry);
+  }
+
+  // A day counts as a session when anyone was recorded: a scan or a green cell on the campus's sheet.
+  const sessionSet = new Set(loggedSessions);
+  for (const { present } of rosterHistory.values()) for (const day of present) if (day >= from && day <= to) sessionSet.add(day);
+  const sessions = [...sessionSet].sort();
 
   const today = todayInTimezone(campus.timezone);
   const datesByStudent = new Map(attendance.map((r) => [r.student_id, r.dates ?? []]));
   const facilitatorOf = new Map(assignments.map((a) => [a.student_id, a.facilitator_id]));
   const peopleById = new Map(people.map((p) => [p.id, p]));
+  const rosterOfStudent = new Map(rosterEntries.filter((r) => r.claimed_by).map((r) => [r.claimed_by as string, r.id]));
 
   const rows: SheetRow[] = students.map((s) => {
     const facilitatorId = facilitatorOf.get(s.id) ?? null;
     const facilitator = facilitatorId ? peopleById.get(facilitatorId) : undefined;
-    const registeredOn = todayInTimezone(campus.timezone, new Date(s.created_at));
+    let registeredOn = todayInTimezone(campus.timezone, new Date(s.created_at));
+    const attended = [...(datesByStudent.get(s.id) ?? [])];
+
+    // A student who came from the roster keeps the history the campus's sheet already had for them.
+    const history = rosterHistory.get(rosterOfStudent.get(s.id) ?? "");
+    if (history) {
+      attended.push(...history.present);
+      if (history.first < registeredOn) registeredOn = history.first;
+    }
+
     return {
       id: s.id,
       name: fullName(s),
@@ -93,9 +145,26 @@ export async function loadAttendanceSheet(
       yearLevel: s.year_level,
       facilitatorId,
       facilitator: facilitator ? fullName(facilitator) : null,
-      ...computeStudentStats(sessions, registeredOn, datesByStudent.get(s.id) ?? [], today),
+      ...computeStudentStats(sessions, registeredOn, attended, today),
     };
   });
+
+  // Names on the roster that haven't registered yet.
+  for (const entry of rosterEntries) {
+    if (entry.claimed_by) continue;
+    const history = rosterHistory.get(entry.id);
+    rows.push({
+      id: `roster:${entry.id}`,
+      name: entry.full_name,
+      gender: entry.gender,
+      course: entry.course,
+      yearLevel: entry.year_level,
+      facilitatorId: null,
+      facilitator: null,
+      rosterOnly: true,
+      ...computeStudentStats(sessions, history?.first ?? today, [...(history?.present ?? [])], today),
+    });
+  }
 
   return { sessions, rows };
 }

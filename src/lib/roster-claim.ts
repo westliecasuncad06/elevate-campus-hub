@@ -8,6 +8,7 @@ type Admin = ReturnType<typeof createAdminClient>;
  * Links a newly registered student to the roster name that matches theirs (same campus, same words in any order and
  * case, middle initials ignored). Returns the roster name it linked to, or null when nothing matched.
  * Only exact matches are linked, so two different people are never mixed up; it never blocks a registration.
+ * The days that name was marked present on the campus's sheet are copied into the student's attendance records.
  */
 export async function claimRosterName(
   admin: Admin,
@@ -38,6 +39,9 @@ export async function claimRosterName(
       .select("id")
       .maybeSingle();
     if (error || !claimed) return null;
+
+    // The attendance already recorded for this name on the campus's sheet becomes the student's own attendance.
+    await admin.rpc("import_roster_attendance", { p_roster: entry.id, p_profile: profileId });
     return entry.full_name;
   } catch {
     return null;
