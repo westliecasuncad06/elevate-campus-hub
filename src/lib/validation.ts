@@ -10,9 +10,19 @@ export interface AccountFields {
   birthday: string | null;
   church: string | null;
   religion: string | null;
+  /** A program from the campus's list (campuses that have one)… */
   programId: string | null;
+  /** …or a typed course (campuses without one). A student has one of the two. */
+  course: string | null;
   yearLevel: number | null;
   studentNumber: string | null;
+}
+
+export interface ParseOptions {
+  /** "program": pick from the campus's list. "text": type it (the campus has no program list). Default "program". */
+  courseMode?: "program" | "text";
+  /** Registration needs the data privacy consent box; editing an existing person doesn't. Default true. */
+  requireConsent?: boolean;
 }
 
 type Parsed = { ok: true; value: AccountFields } | { ok: false; error: string };
@@ -26,8 +36,9 @@ function optional(formData: FormData, key: string): string | null {
   return text(formData, key) || null;
 }
 
-/** Validates the registration/creation form for any account type. */
-export function parseAccountForm(role: Role, formData: FormData, today: string): Parsed {
+/** Validates the registration/creation (or edit) form for any account type. */
+export function parseAccountForm(role: Role, formData: FormData, today: string, options: ParseOptions = {}): Parsed {
+  const { courseMode = "program", requireConsent = true } = options;
   const firstName = text(formData, "first_name");
   const lastName = text(formData, "last_name");
   if (!firstName || !lastName) return { ok: false, error: "First name and last name are required." };
@@ -37,7 +48,7 @@ export function parseAccountForm(role: Role, formData: FormData, today: string):
   if (!looksLikeEmail(email)) return { ok: false, error: "Enter a valid email address." };
 
   // Nobody's details are stored without the data privacy consent (Data Privacy Act of 2012).
-  if (formData.get("privacy_consent") !== "on") {
+  if (requireConsent && formData.get("privacy_consent") !== "on") {
     return { ok: false, error: "Confirm the data privacy consent first. Read the notice to the person, then tick the box." };
   }
 
@@ -63,11 +74,18 @@ export function parseAccountForm(role: Role, formData: FormData, today: string):
   }
 
   let programId: string | null = null;
+  let course: string | null = null;
   let yearLevel: number | null = null;
   if (role === "student") {
     if (!birthday) return { ok: false, error: "Birthday is required for students." };
-    programId = optional(formData, "program_id");
-    if (!programId) return { ok: false, error: "Select a program." };
+    if (courseMode === "program") {
+      programId = optional(formData, "program_id");
+      if (!programId) return { ok: false, error: "Select a program." };
+    } else {
+      course = optional(formData, "course");
+      if (!course) return { ok: false, error: "Enter the student's course." };
+      if (course.length > 80) return { ok: false, error: "Keep the course under 80 characters." };
+    }
     const year = Number(text(formData, "year_level"));
     if (!Number.isInteger(year) || year < 1 || year > 10) return { ok: false, error: "Select a year level." };
     yearLevel = year;
@@ -85,6 +103,7 @@ export function parseAccountForm(role: Role, formData: FormData, today: string):
       church: role === "student" ? optional(formData, "church") : null,
       religion: role === "student" ? optional(formData, "religion") : null,
       programId,
+      course,
       yearLevel,
       studentNumber: role === "student" ? optional(formData, "student_number") : null,
     },

@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { getActor, getCampus } from "@/lib/auth";
 import { createAccount } from "@/lib/accounts";
 import { createClient } from "@/lib/supabase/server";
+import { courseLabel, usesProgramList } from "@/lib/course";
 import { todayInTimezone } from "@/lib/dates";
 import { looksLikeEmail, normalizePhone } from "@/lib/phone";
+import { getActivePrograms } from "@/lib/queries";
 import { parseAccountForm } from "@/lib/validation";
 import type { ActionResult, EntryMethod, Profile } from "@/lib/types";
 
@@ -124,7 +126,7 @@ export async function lookupStudentsAction(
   const supabase = await createClient();
   let builder = supabase
     .from("profiles")
-    .select("id, first_name, last_name, phone, email, program:programs(code)")
+    .select("id, first_name, last_name, phone, email, course, program:programs(code)")
     .eq("role", "student")
     .eq("is_active", true)
     .limit(5);
@@ -151,6 +153,7 @@ export async function lookupStudentsAction(
     last_name: string;
     phone: string | null;
     email: string;
+    course: string | null;
     program: { code: string } | null;
   }>;
 
@@ -177,7 +180,7 @@ export async function lookupStudentsAction(
     name: `${r.first_name} ${r.last_name}`,
     phone: r.phone,
     email: r.email,
-    program: r.program?.code ?? null,
+    program: courseLabel(r),
     status: inThisBatch.has(r.id) ? "in_this_batch" : checkedInToday.has(r.id) ? "checked_in" : "not_in",
   }));
 
@@ -194,16 +197,15 @@ export async function registerFirstTimerAction(
   if (!actor?.campus_id) return FORBIDDEN;
 
   const campus = await getCampus(actor.campus_id);
-  const parsed = parseAccountForm("student", formData, todayInTimezone(campus?.timezone));
-  if (!parsed.ok) return parsed;
-
   const supabase = await createClient();
-  const { data: program } = await supabase
-    .from("programs")
-    .select("campus_id, is_active")
-    .eq("id", parsed.value.programId!)
-    .maybeSingle<{ campus_id: string | null; is_active: boolean }>();
-  if (!program || !program.is_active || (program.campus_id && program.campus_id !== actor.campus_id)) {
+
+  // A campus with its own programs gets a dropdown; any other campus has students type their course.
+  const programs = await getActivePrograms(supabase, actor.campus_id);
+  const parsed = parseAccountForm("student", formData, todayInTimezone(campus?.timezone), {
+    courseMode: usesProgramList(programs) ? "program" : "text",
+  });
+  if (!parsed.ok) return parsed;
+  if (parsed.value.programId && !programs.some((p) => p.id === parsed.value.programId)) {
     return { ok: false, error: "That program isn't available for this campus." };
   }
 

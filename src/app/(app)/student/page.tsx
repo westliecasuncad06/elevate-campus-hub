@@ -6,6 +6,7 @@ import { QrCard } from "@/components/qr/qr-card";
 import { Button } from "@/components/ui/button";
 import { getCampus, requireRole } from "@/lib/auth";
 import { DAY_NAMES } from "@/lib/dates";
+import { courseLabel } from "@/lib/course";
 import { getMyFacilitator } from "@/lib/my-facilitator";
 import { createClient } from "@/lib/supabase/server";
 import { fullName } from "@/lib/types";
@@ -46,7 +47,7 @@ export default async function StudentHome() {
     : { data: [] };
   const slots = (slotRows ?? []) as Slot[];
 
-  const detail = [program?.code, profile.year_level ? `Year ${profile.year_level}` : null, profile.student_number]
+  const detail = [courseLabel({ program, course: profile.course }), profile.year_level ? `Year ${profile.year_level}` : null, profile.student_number]
     .filter(Boolean)
     .join(" · ");
   const canChat = facilitator && facilitator.gender === profile.gender;

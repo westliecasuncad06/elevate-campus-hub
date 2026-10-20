@@ -214,6 +214,25 @@ try {
   const ownDel = await head1.client.from("campus_google_forms").delete().eq("id", addForm.data?.id).select("id");
   check("a Campus Head can remove their form", (ownDel.data ?? []).length === 1, ownDel.error?.message);
 
+  console.log("\nPrograms per campus, and moving people");
+  check("a campus with no programs of its own doesn't see GRC's programs", ((await stuM.client.from("programs").select("id")).data ?? []).length === 0);
+  const mover = await makeUser("mover", "student", c1, "male"); // in no batch, so they can be moved
+  for (const [who, person] of [["a Campus Head", head1], ["a facilitator", facM], ["a student", stuM]]) {
+    const moveTry = await person.client.rpc("admin_move_user", { p_user: mover.id, p_role: "student", p_campus: c2 });
+    check(`${who} can't move people between campuses (only the server can)`, !!moveTry.error);
+  }
+  check("...and nobody was moved", ((await admin.from("profiles").select("campus_id").eq("id", mover.id).single()).data?.campus_id) === c1);
+  const moveAsServer = await admin.rpc("admin_move_user", { p_user: mover.id, p_role: "student", p_campus: c2 });
+  check("the server (service role) can move a student", !moveAsServer.error && moveAsServer.data?.changed === true, moveAsServer.error?.message);
+  const moveBack = await admin.rpc("admin_move_user", { p_user: mover.id, p_role: "student", p_campus: c1 });
+  check("...and move them back", !moveBack.error, moveBack.error?.message);
+  const inOpenBatch = await admin.rpc("admin_move_user", { p_user: stuM2.id, p_role: "student", p_campus: c2 });
+  check("a student who is in an open batch can't be moved", !!inOpenBatch.error && /still open/.test(inOpenBatch.error.message), inOpenBatch.error?.message ?? "no error");
+  const busyFac = await makeUser("busyFac", "facilitator", c1, "male");
+  await busyFac.client.rpc("start_batch"); // leaves a batch open
+  const openFac = await admin.rpc("admin_move_user", { p_user: busyFac.id, p_role: "facilitator", p_campus: c2 });
+  check("a facilitator with an open batch can't be moved", !!openFac.error && /open batch/.test(openFac.error.message), openFac.error?.message ?? "no error");
+
   console.log("\nStudents and their facilitator's details");
   const peek = await stuM.client.from("profiles").select("id, email, phone, birthday").eq("id", facM.id);
   check("a student cannot read their facilitator's email, phone or birthday", (peek.data ?? []).length === 0);

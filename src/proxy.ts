@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SETUP_HELP_HTML, isSupabaseConfigured } from "@/lib/env";
-import { ROLE_HOME, isRole, roleForPath } from "@/lib/roles";
+import { ROLE_HOME, isRole } from "@/lib/roles";
 
 // Paths reachable without a session. /api/cron/* is protected by CRON_SECRET in the route.
 const PUBLIC_PREFIXES = ["/login", "/auth", "/api/cron", "/privacy"];
@@ -14,8 +14,9 @@ function isPublic(pathname: string) {
 /**
  * 1. Refreshes the Supabase session cookie on every request.
  * 2. Redirects signed-out visitors to /login.
- * 3. Keeps each role inside its own area (/admin, /campus-head, /facilitator, /student).
- * The role lives in the JWT's app_metadata; layouts re-check against the database.
+ * 3. Sends signed-in people from "/" and "/login" to their home area. Staying inside your own area (/admin,
+ *    /campus-head, /facilitator, /student) is enforced by each area's layout against the database, not here.
+ * The role in the JWT's app_metadata is only a hint for those redirects: it can be stale after a role change.
  */
 export async function proxy(request: NextRequest) {
   // A fresh checkout has placeholder values: show setup help instead of a stack trace.
@@ -77,8 +78,10 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login") return redirectTo(role ? ROLE_HOME[role] : "/");
   if (pathname === "/" && role) return redirectTo(ROLE_HOME[role]);
 
-  const owner = roleForPath(pathname);
-  if (owner && role && owner !== role) return redirectTo(ROLE_HOME[role]);
+  // Deliberately NOT bouncing people out of another role's area here. The role in the token can be up to an hour
+  // stale after a Super Admin changes someone's role or campus, and redirecting on it would send them back and forth
+  // with the page-level check (which reads the database) until the token refreshed. Each area's layout calls
+  // requireRole(), which is the real gate; the proxy only needs to know who is signed in.
 
   response.headers.set("Cache-Control", "private, no-store");
   return response;

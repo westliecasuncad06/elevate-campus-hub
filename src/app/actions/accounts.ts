@@ -5,7 +5,9 @@ import { getActor, getCampus } from "@/lib/auth";
 import { createAccount, resendInvitation, resetPasswordDirectly, setAccountActive } from "@/lib/accounts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { usesProgramList } from "@/lib/course";
 import { todayInTimezone } from "@/lib/dates";
+import { getActivePrograms } from "@/lib/queries";
 import { creatableRoles, parseAccountForm } from "@/lib/validation";
 import type { ActionResult, Profile, Role } from "@/lib/types";
 
@@ -35,19 +37,16 @@ export async function createAccountAction(
   if (!campusId) return { ok: false, error: "Select a campus." };
 
   const campus = await getCampus(campusId);
-  const parsed = parseAccountForm(role, formData, todayInTimezone(campus?.timezone));
+
+  // A campus with its own programs gets a dropdown; any other campus has students type their course.
+  const programs = await getActivePrograms(await createClient(), campusId);
+  const parsed = parseAccountForm(role, formData, todayInTimezone(campus?.timezone), {
+    courseMode: usesProgramList(programs) ? "program" : "text",
+  });
   if (!parsed.ok) return parsed;
 
-  if (parsed.value.programId) {
-    const supabase = await createClient();
-    const { data: program } = await supabase
-      .from("programs")
-      .select("campus_id, is_active")
-      .eq("id", parsed.value.programId)
-      .maybeSingle<{ campus_id: string | null; is_active: boolean }>();
-    if (!program || !program.is_active || (program.campus_id && program.campus_id !== campusId)) {
-      return { ok: false, error: "That program isn't available for this campus." };
-    }
+  if (parsed.value.programId && !programs.some((p) => p.id === parsed.value.programId)) {
+    return { ok: false, error: "That program isn't available for this campus." };
   }
 
   const result = await createAccount({ role, campusId, fields: parsed.value, createdBy: actor.id });

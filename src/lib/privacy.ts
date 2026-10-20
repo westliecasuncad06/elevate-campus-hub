@@ -32,7 +32,7 @@ export const DATA_PURPOSES: DataPurpose[] = [
     why: "To identify you accurately and know whether you are under 18, in which case a parent or guardian's agreement applies.",
   },
   {
-    data: "Program and year level",
+    data: "Course (program) and year level",
     why: "To follow up with students by course and year.",
   },
   {
@@ -63,7 +63,7 @@ export const DATA_PURPOSES: DataPurpose[] = [
 /** The fields collected for a given kind of account (staff accounts need much less than students). */
 export function collectedFor(role: Role): string {
   if (role === "student") {
-    return "your name, phone number, email, gender, birthday, program and year level. Student number, church and religion are optional.";
+    return "your name, phone number, email, gender, birthday, course (program) and year level. Student number, church and religion are optional.";
   }
   return "your name, email and gender. Phone number and birthday are optional.";
 }

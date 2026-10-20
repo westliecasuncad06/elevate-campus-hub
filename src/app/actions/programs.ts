@@ -11,7 +11,7 @@ function refresh() {
   revalidatePath("/", "layout");
 }
 
-/** Super Admin: add a program (campus left blank = available to every campus). */
+/** Super Admin: add a program to a campus. (A campus with no programs lets students type their course instead.) */
 export async function createProgramAction(
   _prev: ActionResult | null,
   formData: FormData,
@@ -22,16 +22,20 @@ export async function createProgramAction(
   // Keep the casing as typed: some codes are mixed-case (BSCpE).
   const code = String(formData.get("code") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
-  const campus = String(formData.get("campus_id") ?? "");
-  const campusId = campus && campus !== "global" ? campus : null;
+  const campusId = String(formData.get("campus_id") ?? "");
 
+  if (!campusId) return { ok: false, error: "Pick the campus this program belongs to." };
   if (!/^[A-Za-z0-9 &/-]{2,16}$/.test(code)) return { ok: false, error: "Program code must be 2–16 letters or numbers (for example BSIT)." };
   if (!name) return { ok: false, error: "Enter the program name." };
 
   const supabase = await createClient();
-  let scope = supabase.from("programs").select("sort_order").order("sort_order", { ascending: false }).limit(1);
-  scope = campusId ? scope.eq("campus_id", campusId) : scope.is("campus_id", null);
-  const { data: last } = await scope.maybeSingle<{ sort_order: number }>();
+  const { data: last } = await supabase
+    .from("programs")
+    .select("sort_order")
+    .eq("campus_id", campusId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ sort_order: number }>();
 
   const { error } = await supabase
     .from("programs")

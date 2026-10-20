@@ -51,7 +51,7 @@ async function tryQ(sql, params) {
 const campus = await q("select id from public.campuses where code = 'GRC'");
 const c1 = campus[0].id;
 const [{ id: c2 }] = await q("insert into public.campuses (code, name) values ('TS2','Test 2') returning id");
-check("seed: GRC campus and 4 global programs exist", campus.length === 1 && (await q("select count(*)::int n from public.programs where campus_id is null"))[0].n === 4);
+check("seed: GRC campus exists and the 4 programs belong to it (none are global)", campus.length === 1 && (await q("select count(*)::int n from public.programs where campus_id = $1", [c1]))[0].n === 4 && (await q("select count(*)::int n from public.programs where campus_id is null"))[0].n === 0);
 
 async function mkUser(key, role, campusId, gender) {
   const id = randomUUID();
@@ -358,7 +358,7 @@ check("unassigned student cannot", (await asUser(stuM2, () => q("select id from 
 check("campus head cannot create programs", !!(await asUser(head1, () => tryQ("insert into public.programs (code, name) values ('HACK','Hack')"))).error);
 check("super admin can create programs", !(await asUser(admin, () => tryQ("insert into public.programs (code, name) values ('BSCpE','Computer Eng')"))).error);
 check("duplicate program code (case-insensitive) is rejected", !!(await asUser(admin, () => tryQ("insert into public.programs (code, name) values ('bscpe','dup')"))).error);
-check("everyone can read global programs", (await asUser(stuM, () => q("select id from public.programs"))).length === 5);
+check("a student reads their campus's programs (and any global one)", (await asUser(stuM, () => q("select id from public.programs"))).length === 5);
 await q("insert into public.system_logs (event) values ('keep_alive')");
 check("only super admin reads system logs", (await asUser(head1, () => q("select id from public.system_logs"))).length === 0 && (await asUser(admin, () => q("select id from public.system_logs"))).length === 1);
 r = await asUser(head1, () => tryQ("update public.campuses set name = 'hacked' where id = $1 returning id", [c1]));
@@ -373,6 +373,63 @@ check("campus head sees only own campus", (await asUser(head1, () => q("select i
     [dupId, c1, phone],
   );
   check("duplicate phone in a campus is rejected", !!dup.error, "no error");
+}
+
+console.log("\nTyped courses and moving people (migrations 0011, 0012)");
+{
+  const stuOther = await mkUser("stuOther", "student", c2, "male");
+  check("a student of another campus doesn't see GRC's programs (only global ones)", (await asUser(stuOther, () => q("select id from public.programs"))).length === 1);
+
+  check("a student can have a typed course", !(await tryQ("update public.profiles set course = 'BS Nursing' where id = $1", [stuM3])).error);
+  check("a blank course is rejected", !!(await tryQ("update public.profiles set course = '   ' where id = $1", [stuM3])).error);
+  check("a course can't be longer than 80 characters", !!(await tryQ("update public.profiles set course = $1 where id = $2", ["x".repeat(81), stuM3])).error);
+  await q("update public.profiles set course = null where id = $1", [stuM3]);
+
+  const move = (u, role, campus) => tryQ("select public.admin_move_user($1::uuid, $2, $3::uuid) as r", [u, role, campus]);
+  const mvF = await mkUser("mvF", "facilitator", c1, "female");
+  const mvS = await mkUser("mvS", "student", c1, "female");
+  await q("insert into public.facilitator_students (facilitator_id, student_id, campus_id) values ($1,$2,$3)", [mvF, mvS, c1]);
+
+  let m = await move(mvF, "facilitator", c1);
+  check("moving someone to where they already are changes nothing", m.rows?.[0].r.changed === false, m.error);
+
+  m = await move(mvF, "facilitator", c2);
+  check("a facilitator can be moved to another campus", m.rows?.[0].r.changed === true && (await q("select campus_id from public.profiles where id = $1", [mvF]))[0].campus_id === c2, m.error);
+  check("...which ends their student assignments", m.rows?.[0].r.ended_assignments === 1 && (await q("select is_active from public.facilitator_students where facilitator_id = $1", [mvF]))[0].is_active === false);
+  check("...and the student is left without a facilitator, not deleted", (await q("select id from public.profiles where id = $1", [mvS])).length === 1);
+
+  m = await move(mvF, "campus_head", c2);
+  check("a facilitator can become a Campus Head (of any campus)", m.rows?.[0].r.changed === true && (await q("select role from public.profiles where id = $1", [mvF]))[0].role === "campus_head", m.error);
+  m = await move(mvF, "campus_head", c1);
+  check("a Campus Head can be moved to another campus", (await q("select campus_id from public.profiles where id = $1", [mvF]))[0].campus_id === c1, m.error);
+
+  check("a student can't become staff", !!(await move(mvS, "facilitator", c1)).error);
+  check("staff can't become a student", !!(await move(mvF, "student", c1)).error);
+  check("a Super Admin can't be moved or demoted", !!(await move(admin, "campus_head", c1)).error);
+  check("an unknown role is refused", !!(await move(mvF, "super_admin", c1)).error);
+  check("an unknown person is refused", !!(await move(randomUUID(), "facilitator", c1)).error);
+
+  const [{ id: cOff }] = await q("insert into public.campuses (code, name, is_active) values ('OFF', 'Closed campus', false) returning id");
+  check("moving to an inactive campus is refused", !!(await move(mvF, "campus_head", cOff)).error);
+
+  const mvF2 = await mkUser("mvF2", "facilitator", c1, "male");
+  const mvS2 = await mkUser("mvS2", "student", c1, "male");
+  const open = await startBatch(mvF2);
+  const openId = open.rows?.[0].r.id;
+  m = await move(mvF2, "facilitator", c2);
+  check("someone with an open batch can't be moved until it is finished", !!m.error && /open batch/.test(m.error), m.error ?? "no error");
+  await addTo(mvF2, openId, mvS2, "qr");
+  m = await move(mvS2, "student", c2);
+  check("a student in an open batch can't be moved either", !!m.error && /still open/.test(m.error), m.error ?? "no error");
+  check("...and the refused moves changed nothing", (await q("select campus_id from public.profiles where id in ($1, $2)", [mvF2, mvS2])).every((p) => p.campus_id === c1));
+
+  for (const [who, uid] of [["a Campus Head", head1], ["a facilitator", facM], ["a student", stuM], ["the Super Admin", admin]]) {
+    check(`${who} can't call admin_move_user from the app (only the server can)`, !!(await asUser(uid, () => move(mvF, "campus_head", c1))).error);
+  }
+  await db.exec("reset role; set role anon;");
+  const anonMove = await move(mvF, "campus_head", c1);
+  await db.exec("reset role");
+  check("anonymous users can't call it either", !!anonMove.error);
 }
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

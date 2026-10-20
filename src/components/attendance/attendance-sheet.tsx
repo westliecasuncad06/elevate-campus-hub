@@ -92,7 +92,6 @@ function download(filename: string, text: string) {
 export function AttendanceSheet({
   sessions,
   rows,
-  programs,
   facilitators,
   campusCode,
   from,
@@ -100,7 +99,6 @@ export function AttendanceSheet({
 }: {
   sessions: string[];
   rows: SheetRow[];
-  programs: Option[];
   facilitators: Option[];
   campusCode: string;
   from: string;
@@ -113,6 +111,14 @@ export function AttendanceSheet({
   const [status, setStatus] = useState(ALL);
   const [sort, setSort] = useState<SortKey>("name");
 
+  // Whatever courses the students have: program codes at a campus with a list, typed courses at one without.
+  const courses = useMemo<Option[]>(() => {
+    const present = [...new Set(rows.map((r) => r.course).filter((c): c is string => Boolean(c)))].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+    return present.map((c) => ({ value: c, label: c }));
+  }, [rows]);
+
   const years = useMemo<Option[]>(() => {
     const present = [...new Set(rows.map((r) => r.yearLevel).filter((y): y is number => y !== null))].sort((a, b) => a - b);
     return [{ value: ALL, label: "All years" }, ...present.map((y) => ({ value: String(y), label: yearLabel(y) }))];
@@ -122,7 +128,7 @@ export function AttendanceSheet({
     const needle = query.trim().toLowerCase();
     const filtered = rows.filter((r) => {
       if (needle && !r.name.toLowerCase().includes(needle)) return false;
-      if (program !== ALL && r.programId !== program) return false;
+      if (program !== ALL && r.course !== program) return false;
       if (year !== ALL && String(r.yearLevel) !== year) return false;
       if (facilitator === "none" ? r.facilitatorId !== null : facilitator !== ALL && r.facilitatorId !== facilitator) return false;
       if (status === "at-risk") return r.atRisk;
@@ -162,10 +168,10 @@ export function AttendanceSheet({
           <Input id="sheet-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Student name" />
         </div>
         <FormSelect
-          label="Program"
+          label="Course"
           name="program"
           defaultValue={ALL}
-          options={[{ value: ALL, label: "All programs" }, ...programs]}
+          options={[{ value: ALL, label: "All courses" }, ...courses]}
           onValueChange={setProgram}
           className="w-40"
         />
@@ -250,7 +256,7 @@ export function AttendanceSheet({
                       {r.facilitator ? ` · ${r.facilitator}` : ""}
                     </p>
                     {/* Phones: the Year / Course column is hidden to leave room for the dates, so it goes here. */}
-                    <p className="text-xs text-muted-foreground sm:hidden">{yearCourse(r.yearLevel, r.programCode) || "—"}</p>
+                    <p className="text-xs text-muted-foreground sm:hidden">{yearCourse(r.yearLevel, r.course) || "—"}</p>
                     {r.atRisk ? (
                       <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-destructive">
                         <TriangleAlertIcon className="size-3.5" />
@@ -259,7 +265,7 @@ export function AttendanceSheet({
                     ) : null}
                   </TableCell>
                   <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
-                    {yearCourse(r.yearLevel, r.programCode) || "—"}
+                    {yearCourse(r.yearLevel, r.course) || "—"}
                   </TableCell>
                   {r.cells.map((cell, i) => (
                     <TableCell key={sessions[i]} className="px-1 text-center">

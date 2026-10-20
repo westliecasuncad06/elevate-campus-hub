@@ -146,8 +146,7 @@ function row(over: Partial<SheetRow>): SheetRow {
     id: "x",
     name: "Name",
     gender: "female",
-    programId: null,
-    programCode: "BSBA",
+    course: "BSBA",
     yearLevel: 2,
     facilitatorId: null,
     facilitator: null,
@@ -215,7 +214,7 @@ describe("toCsv", () => {
     const stats = computeStudentStats(sessions.slice(0, 3), "2026-01-01", ["2026-09-18", "2026-10-02"]);
     const csv = toCsv(
       sessions.slice(0, 3),
-      [row({ ...stats, name: "Doon, Aisa", yearLevel: 2, programCode: "BSBA", facilitator: "Joy Cruz" })],
+      [row({ ...stats, name: "Doon, Aisa", yearLevel: 2, course: "BSBA", facilitator: "Joy Cruz" })],
     );
     const [header, line] = csv.split("\r\n");
     expect(header).toBe(

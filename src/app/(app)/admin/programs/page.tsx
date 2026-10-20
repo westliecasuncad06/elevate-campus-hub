@@ -20,26 +20,28 @@ export default async function ProgramsPage() {
   ]);
   const programs = (programRows ?? []) as Program[];
   const campuses = (campusRows ?? []) as Pick<Campus, "id" | "code" | "name">[];
-  const campusCode = new Map(campuses.map((c) => [c.id, c.code]));
 
-  const campusOptions = [
-    { value: "global", label: "All campuses" },
-    ...campuses.map((c) => ({ value: c.id, label: c.code })),
-  ];
+  const campusOptions = campuses.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` }));
 
-  // Group by scope so up/down arrows only move a program within its own list.
-  const groups = new Map<string, Program[]>();
+  // One list per campus, so the up/down arrows only move a program within its own campus.
+  const byCampus = new Map<string, Program[]>();
   for (const p of programs) {
-    const key = p.campus_id ?? "global";
-    groups.set(key, [...(groups.get(key) ?? []), p]);
+    const key = p.campus_id ?? "none";
+    byCampus.set(key, [...(byCampus.get(key) ?? []), p]);
   }
-  const groupKeys = [...groups.keys()].sort((a, b) => (a === "global" ? -1 : b === "global" ? 1 : a.localeCompare(b)));
+  const sections = [
+    ...campuses.map((c) => ({ key: c.id, title: `${c.code} — ${c.name}`, list: byCampus.get(c.id) ?? [], hasCampus: true })),
+    // Left over from before programs belonged to a campus; nobody is offered these any more.
+    ...(byCampus.has("none")
+      ? [{ key: "none", title: "Not assigned to a campus", list: byCampus.get("none")!, hasCampus: false }]
+      : []),
+  ];
 
   return (
     <>
       <PageHeader
         title="Programs"
-        description="Courses students choose when they register. Changes show up in every registration form straight away."
+        description="Each campus has its own list of courses that students pick when they register. A campus with no programs lets students type their course instead."
         actions={
           <FormDialog
             action={createProgramAction}
@@ -54,23 +56,26 @@ export default async function ProgramsPage() {
                 <Field label="Code" name="code" placeholder="BSCpE" required maxLength={16} />
                 <Field label="Name" name="name" placeholder="BS Computer Engineering" required />
               </div>
-              <FormSelect label="Available to" name="campus_id" options={campusOptions} defaultValue="global" />
+              <FormSelect label="Campus" name="campus_id" options={campusOptions} placeholder="Select a campus" required />
             </div>
           </FormDialog>
         }
       />
 
-      {programs.length === 0 ? (
-        <EmptyState title="No programs yet" hint="Add programs like BSIT or BSED so students can pick one." />
+      {campuses.length === 0 ? (
+        <EmptyState title="No campuses yet" hint="Add a campus first, then add its programs." />
       ) : (
         <div className="grid gap-6">
-          {groupKeys.map((key) => {
-            const list = groups.get(key)!;
-            return (
-              <section key={key}>
-                <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
-                  {key === "global" ? "All campuses" : `${campusCode.get(key) ?? "Campus"} only`}
-                </h2>
+          {sections.map(({ key, title, list, hasCampus }) => (
+            <section key={key}>
+              <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{title}</h2>
+              {list.length === 0 ? (
+                <p className="rounded-xl border border-dashed bg-card/50 px-4 py-5 text-sm text-muted-foreground">
+                  {hasCampus
+                    ? "No programs. Students here type their course when they register. Add a program to give them a dropdown instead."
+                    : "No programs."}
+                </p>
+              ) : (
                 <div className="overflow-x-auto rounded-xl border bg-card">
                   <Table>
                     <TableHeader>
@@ -125,9 +130,9 @@ export default async function ProgramsPage() {
                     </TableBody>
                   </Table>
                 </div>
-              </section>
-            );
-          })}
+              )}
+            </section>
+          ))}
         </div>
       )}
     </>

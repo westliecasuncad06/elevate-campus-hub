@@ -46,6 +46,61 @@ describe("parseAccountForm (student)", () => {
   });
 });
 
+describe("course: pick a program, or type it at a campus with no program list", () => {
+  const typed = { ...student, course: "BS Nursing" };
+  const { program_id: _program, ...withoutProgram } = student; // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  it("takes the program from the dropdown by default", () => {
+    const result = parseAccountForm("student", form(student), "2026-03-11");
+    expect(result.ok && result.value.programId).toBe("11111111-1111-1111-1111-111111111111");
+    expect(result.ok && result.value.course).toBeNull();
+  });
+
+  it("takes a typed course when the campus has no program list", () => {
+    const result = parseAccountForm("student", form({ ...withoutProgram, course: "  BS Nursing " }), "2026-03-11", { courseMode: "text" });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.course).toBe("BS Nursing");
+    expect(result.ok && result.value.programId).toBeNull();
+  });
+
+  it("ignores a stray program id in text mode, and a stray typed course in program mode", () => {
+    const text = parseAccountForm("student", form(typed), "2026-03-11", { courseMode: "text" });
+    expect(text.ok && text.value.programId).toBeNull();
+    const program = parseAccountForm("student", form(typed), "2026-03-11");
+    expect(program.ok && program.value.course).toBeNull();
+  });
+
+  it("requires the course in whichever mode applies", () => {
+    expect(parseAccountForm("student", form({ ...withoutProgram, course: "  " }), "2026-03-11", { courseMode: "text" }).ok).toBe(false);
+    expect(parseAccountForm("student", form(withoutProgram), "2026-03-11").ok).toBe(false);
+  });
+
+  it("keeps a typed course under 80 characters", () => {
+    const long = parseAccountForm("student", form({ ...withoutProgram, course: "x".repeat(81) }), "2026-03-11", { courseMode: "text" });
+    expect(long.ok).toBe(false);
+    expect(parseAccountForm("student", form({ ...withoutProgram, course: "x".repeat(80) }), "2026-03-11", { courseMode: "text" }).ok).toBe(true);
+  });
+
+  it("doesn't store a course for staff", () => {
+    const staff = parseAccountForm(
+      "facilitator",
+      form({ first_name: "Ben", last_name: "Cruz", email: "ben@example.com", gender: "male", course: "Nursing", privacy_consent: "on" }),
+      "2026-03-11",
+      { courseMode: "text" },
+    );
+    expect(staff.ok && staff.value.course).toBeNull();
+  });
+});
+
+describe("editing an existing person doesn't ask for consent again", () => {
+  it("skips the consent check only when told to", () => {
+    const data = form(student);
+    data.delete("privacy_consent");
+    expect(parseAccountForm("student", data, "2026-03-11").ok).toBe(false);
+    expect(parseAccountForm("student", data, "2026-03-11", { requireConsent: false }).ok).toBe(true);
+  });
+});
+
 describe("data privacy consent", () => {
   it("refuses to register anyone without the consent box ticked", () => {
     const data = form(student);

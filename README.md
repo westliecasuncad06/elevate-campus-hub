@@ -9,7 +9,7 @@ The full specification is in [PROJECT_SPECIFICATION.md](PROJECT_SPECIFICATION.md
 
 | Role | What they do |
 |---|---|
-| Super Admin (IT) | Campuses, programs, all users, direct password resets, system logs |
+| Super Admin (IT) | Campuses, each campus's programs, all users (add, **edit, move between campuses, change role, delete**), direct password resets, system logs |
 | Campus Head | Creates facilitators/students, scans attendance, watches each student's consistency (**Attendance sheet**), reviews/locks the daily report, sends it to the Google Form |
 | Facilitator | Scans attendance, registers first timers, records engagement, chats with same-gender students |
 | Student | Own QR card, their facilitator's **name** and availability (not their email or phone), attendance history, chat |
@@ -32,6 +32,33 @@ and **Live** (who is facilitating right now and who they're with; refreshes ever
 > attendance becomes finished batches in History). A brand-new project only needs `supabase/setup.sql`,
 > which already includes it.
 
+### Managing users (Super Admin)
+
+**Users** lists everyone with a login. Each row has **Edit**, **Reset password**, **Deactivate** and **Delete**.
+
+- **Edit** changes any of the person's details (name, email, phone, gender, birthday, and for students the course, year, church,
+  religion and student number). Changing the **email** changes their login email too.
+- **Campus and role.** Any Campus Head, facilitator or student can be moved to another campus. A Campus Head or facilitator can
+  also become the other role, at any campus, which is how one person ends up heading a different campus. (A person belongs to
+  one campus at a time. Students stay students, and Super Admins have no campus.)
+  - Their current student assignments end, because they only make sense inside one campus and one role. Those students are
+    matched with a facilitator again at their next meeting. Past attendance stays with the campus where it happened.
+  - They must have no open batch (and a student must not be in one): finish it first. If a move is refused, nothing changes.
+  - The change applies right away, even if the person is signed in.
+- **Delete** is permanent. A student's attendance, engagement answers, chat and notifications go with them. A Campus Head or
+  facilitator who has recorded attendance, run a batch or sent a report **can't be deleted**, because those records carry their
+  name: **Deactivate** them instead, which keeps the history. You can't delete yourself or another Super Admin.
+- Every change is written to the system logs (which fields changed, never the values).
+
+### Programs and courses
+
+Programs belong to **one campus**. GRC's are BSIT, BSED, BSA and BSBA, managed under **Programs**.
+
+- A campus **with** programs gives students a **Program** dropdown when they register.
+- A campus **without** any lets students **type their course** (for example "BS Nursing"). Add a program to that campus later
+  and its registration forms switch to the dropdown.
+- The course is shown (program code or typed course) on the Students list, the attendance sheet and the student's card.
+
 ### Attendance sheet (Campus Head)
 
 **Attendance sheet** is the Campus Head's view of how consistently each student comes, laid out like the ministry's Google
@@ -42,7 +69,7 @@ a ✕ means not, and a dash means the day didn't count for that student.
 - A student is only counted against sessions held **after they registered**, and today's open session never counts as missed.
 - **Status** from the share of countable sessions attended: Consistent 80%+, Regular 50–79%, Occasional 20–49%, Rarely under 20%,
   New with fewer than 2 sessions. **At risk** = came before but missed the last 3 or more in a row.
-- Filter by program, year, facilitator or status, search by name, sort (for example least consistent first), and **Export CSV**.
+- Filter by course, year, facilitator or status, search by name, sort (for example least consistent first), and **Export CSV**.
 
 ### Daily report → Google Form
 
@@ -77,7 +104,9 @@ the Gospel, accepted Jesus, are willing to join a Dgroup, and volunteers. **Dail
   The wording lives in `src/lib/report-text.ts` if it ever needs to change.
 
 > **Already ran `setup.sql` before this?** Run `npm run db:migrate` to apply `0008_form_report_and_attendance_sheet.sql` and
-> `0009_saved_google_forms.sql` (which moves any form link a campus already had into the saved-forms list).
+> `0009_saved_google_forms.sql` (which moves any form link a campus already had into the saved-forms list). Later migrations
+> (`0010`–`0012`: facilitator privacy, programs per campus with typed courses, and moving people between campuses) are applied the
+> same way.
 
 ### Notifications
 

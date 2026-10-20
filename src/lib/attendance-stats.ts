@@ -101,8 +101,8 @@ export interface SheetRow extends StudentStats {
   id: string;
   name: string;
   gender: "male" | "female" | null;
-  programId: string | null;
-  programCode: string | null;
+  /** Their program code, or the course they typed (campuses without a program list). */
+  course: string | null;
   yearLevel: number | null;
   facilitatorId: string | null;
   facilitator: string | null;
@@ -138,8 +138,8 @@ export function yearLabel(year: number | null): string {
 }
 
 /** "2nd Year / BSBA", "BSBA", "2nd Year" or "" — the "Year Level / Course" column. */
-export function yearCourse(year: number | null, programCode: string | null): string {
-  return [yearLabel(year), programCode ?? ""].filter(Boolean).join(" / ");
+export function yearCourse(year: number | null, course: string | null): string {
+  return [yearLabel(year), course ?? ""].filter(Boolean).join(" / ");
 }
 
 export type SortKey = "name" | "rate-asc" | "rate-desc" | "recent";
@@ -189,7 +189,7 @@ export function toCsv(sessions: string[], rows: SheetRow[]): string {
       [
         r.name,
         r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "",
-        yearCourse(r.yearLevel, r.programCode),
+        yearCourse(r.yearLevel, r.course),
         r.facilitator ?? "",
         // Blank = not counted (before they registered, or today and not recorded yet).
         ...r.cells.map((c) => (c === "attended" ? "Attended" : c === "missed" ? "Not attended" : "")),

@@ -23,11 +23,13 @@ import type { Program, Role } from "@/lib/types";
 export function AccountDialog({
   role,
   programs,
+  programsByCampus,
   campuses,
   label,
 }: {
   role: Role;
   programs?: Program[];
+  programsByCampus?: Record<string, Program[]>;
   campuses?: Option[];
   label?: string;
 }) {
@@ -53,6 +55,7 @@ export function AccountDialog({
             key={formKey}
             role={role}
             programs={programs}
+            programsByCampus={programsByCampus}
             campuses={campuses}
             onDone={close}
           />
@@ -65,11 +68,13 @@ export function AccountDialog({
 function AccountForm({
   role,
   programs,
+  programsByCampus,
   campuses,
   onDone,
 }: {
   role: Role;
   programs?: Program[];
+  programsByCampus?: Record<string, Program[]>;
   campuses?: Option[];
   onDone: () => void;
 }) {
@@ -90,7 +95,7 @@ function AccountForm({
           They&apos;ll get an email with a link to choose their own password.
         </DialogDescription>
       </DialogHeader>
-      <AccountFields role={role} programs={programs} campuses={campuses} />
+      <AccountFields role={role} programs={programs} programsByCampus={programsByCampus} campuses={campuses} />
       <FormMessage state={state?.ok ? null : state} />
       <DialogFooter>
         <SubmitButton pending={pending} pendingText="Sending invitation…">

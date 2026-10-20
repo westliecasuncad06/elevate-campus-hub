@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeStudentStats, type SheetRow } from "@/lib/attendance-stats";
+import { courseLabel } from "@/lib/course";
 import { todayInTimezone } from "@/lib/dates";
 import { fullName, type Gender } from "@/lib/types";
 
@@ -23,7 +24,7 @@ interface StudentRow {
   first_name: string;
   last_name: string;
   gender: Gender | null;
-  program_id: string | null;
+  course: string | null;
   year_level: number | null;
   created_at: string;
   program: { code: string } | null;
@@ -52,7 +53,7 @@ export async function loadAttendanceSheet(
     fetchAll<StudentRow>((a, b) =>
       supabase
         .from("profiles")
-        .select("id, first_name, last_name, gender, program_id, year_level, created_at, program:programs(code)")
+        .select("id, first_name, last_name, gender, course, year_level, created_at, program:programs(code)")
         .eq("role", "student")
         .eq("is_active", true)
         .order("id")
@@ -88,8 +89,7 @@ export async function loadAttendanceSheet(
       id: s.id,
       name: fullName(s),
       gender: s.gender,
-      programId: s.program_id,
-      programCode: s.program?.code ?? null,
+      course: courseLabel(s),
       yearLevel: s.year_level,
       facilitatorId,
       facilitator: facilitator ? fullName(facilitator) : null,

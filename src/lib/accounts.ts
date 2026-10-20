@@ -103,6 +103,7 @@ export async function createAccount(params: {
     church: fields.church,
     religion: fields.religion,
     program_id: fields.programId,
+    course: fields.course,
     year_level: fields.yearLevel,
     student_number: fields.studentNumber,
     invitation_sent_at: new Date().toISOString(),

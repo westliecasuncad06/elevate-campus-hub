@@ -9,6 +9,7 @@ import { EmptyState, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
+import { courseLabel } from "@/lib/course";
 import { getActivePrograms } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { fullName, type Profile } from "@/lib/types";
@@ -90,7 +91,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
-                <TableHead>Program</TableHead>
+                <TableHead>Course</TableHead>
                 <TableHead>Facilitator</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">
@@ -112,7 +113,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
                       </p>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {s.program?.code ?? "—"}
+                      {courseLabel(s) ?? "—"}
                       {s.year_level ? ` · Year ${s.year_level}` : ""}
                     </TableCell>
                     <TableCell>

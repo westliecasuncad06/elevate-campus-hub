@@ -47,13 +47,11 @@ export default async function AttendanceSheetPage({ searchParams }: PageProps<"/
   if (tooLong) from = shiftDays(to, -(MAX_DAYS - 1));
 
   const supabase = await createClient();
-  const [{ sessions, rows }, { data: programRows }, { data: facilitatorRows }] = await Promise.all([
+  const [{ sessions, rows }, { data: facilitatorRows }] = await Promise.all([
     loadAttendanceSheet(supabase, campus, from, to),
-    supabase.from("programs").select("id, code").order("sort_order").order("code"),
     supabase.from("profiles").select("id, first_name, last_name").in("role", ["facilitator", "campus_head"]).eq("is_active", true).order("first_name"),
   ]);
 
-  const programs: Option[] = (programRows ?? []).map((p) => ({ value: p.id as string, label: p.code as string }));
   const facilitators: Option[] = (facilitatorRows ?? []).map((p) => ({
     value: p.id as string,
     label: `${p.first_name} ${p.last_name}`.trim(),
@@ -105,7 +103,6 @@ export default async function AttendanceSheetPage({ searchParams }: PageProps<"/
         key={`${from}-${to}`}
         sessions={sessions}
         rows={rows}
-        programs={programs}
         facilitators={facilitators}
         campusCode={campus.code}
         from={from}

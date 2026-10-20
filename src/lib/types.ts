@@ -37,6 +37,8 @@ export interface Profile {
   church: string | null;
   religion: string | null;
   program_id: string | null;
+  /** Typed course, used when the student's campus has no program list (otherwise program_id is set). */
+  course: string | null;
   year_level: number | null;
   student_number: string | null;
   qr_token: string | null;

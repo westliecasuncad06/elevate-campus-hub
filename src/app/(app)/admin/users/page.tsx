@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AccountDialog } from "@/components/accounts/account-dialog";
+import { DeleteUserButton } from "@/components/accounts/delete-user-dialog";
+import { EditUserDialog } from "@/components/accounts/edit-user-dialog";
 import { ActiveToggleButton, ResendInviteButton, ResetPasswordButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { FormSelect, SubmitButton } from "@/components/forms";
@@ -7,8 +9,9 @@ import { Field } from "@/components/forms";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
+import { courseLabel } from "@/lib/course";
 import { ROLE_LABEL } from "@/lib/roles";
-import { getActivePrograms } from "@/lib/queries";
+import { getActiveProgramsByCampus } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { fullName, type Campus, type Profile } from "@/lib/types";
 
@@ -28,7 +31,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
   const campuses = (campusRows ?? []) as Pick<Campus, "id" | "code" | "name">[];
   const campusCode = new Map(campuses.map((c) => [c.id, c.code]));
 
-  let query = supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(PAGE_SIZE);
+  let query = supabase.from("profiles").select("*, program:programs(code)").order("created_at", { ascending: false }).limit(PAGE_SIZE);
   if (role !== "all") query = query.eq("role", role);
   if (campus !== "all") query = query.eq("campus_id", campus);
   if (q) {
@@ -37,9 +40,9 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
     query = query.or(`first_name.ilike.%${safe}%,last_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`);
   }
   const { data } = await query;
-  const people = (data ?? []) as Profile[];
+  const people = (data ?? []) as unknown as (Profile & { program: { code: string } | null })[];
 
-  const programs = await getActivePrograms(supabase, null);
+  const programsByCampus = await getActiveProgramsByCampus(supabase);
   const campusOptions = campuses.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` }));
 
   return (
@@ -51,7 +54,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
           <>
             <AccountDialog role="campus_head" campuses={campusOptions} />
             <AccountDialog role="facilitator" campuses={campusOptions} />
-            <AccountDialog role="student" programs={programs} campuses={campusOptions} />
+            <AccountDialog role="student" programsByCampus={programsByCampus} campuses={campusOptions} />
           </>
         }
       />
@@ -102,6 +105,11 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                     <TableCell>
                       <p className="font-medium">{fullName(p)}</p>
                       <p className="text-xs text-muted-foreground">{p.email}</p>
+                      {p.role === "student" ? (
+                        <p className="text-xs text-muted-foreground">
+                          {[courseLabel(p), p.year_level ? `Year ${p.year_level}` : null].filter(Boolean).join(" · ") || "No course yet"}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell>{ROLE_LABEL[p.role]}</TableCell>
                     <TableCell>{p.campus_id ? (campusCode.get(p.campus_id) ?? "—") : "All"}</TableCell>
@@ -110,9 +118,33 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
+                        <EditUserDialog
+                          person={{
+                            id: p.id,
+                            role: p.role,
+                            campus_id: p.campus_id,
+                            first_name: p.first_name,
+                            last_name: p.last_name,
+                            email: p.email,
+                            phone: p.phone,
+                            gender: p.gender,
+                            birthday: p.birthday,
+                            church: p.church,
+                            religion: p.religion,
+                            program_id: p.program_id,
+                            course: p.course,
+                            year_level: p.year_level,
+                            student_number: p.student_number,
+                          }}
+                          campuses={campusOptions}
+                          programsByCampus={programsByCampus}
+                        />
                         {isPending(p) ? <ResendInviteButton profileId={p.id} /> : null}
                         <ResetPasswordButton profileId={p.id} name={fullName(p)} />
                         {p.id !== actor.id ? <ActiveToggleButton profileId={p.id} active={p.is_active} /> : null}
+                        {p.id !== actor.id && p.role !== "super_admin" ? (
+                          <DeleteUserButton profileId={p.id} name={fullName(p)} role={p.role} />
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>
