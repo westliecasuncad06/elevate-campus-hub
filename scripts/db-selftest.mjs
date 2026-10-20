@@ -126,7 +126,20 @@ check("log_date and batch_date use the campus timezone", (await q("select log_da
 console.log("\nVisibility (RLS)");
 check("other campus's head sees none of campus 1's profiles", (await asUser(head2, () => q("select id from public.profiles where campus_id = $1", [c1]))).length === 0);
 check("a student sees only themselves among students", (await asUser(stuM, () => q("select id from public.profiles where role='student'"))).length === 1);
-check("a student sees their assigned facilitator", (await asUser(stuM, () => q("select id from public.profiles where role='facilitator'"))).map((p) => p.id).join() === facM);
+// A student must not read their facilitator's profile row (email, phone, birthday, church, ...); they get the name via my_facilitator()
+check("a student cannot read their facilitator's profile row", (await asUser(stuM, () => q("select id from public.profiles where role='facilitator'"))).length === 0);
+check("a student can't read the facilitator's email or phone by id either", (await asUser(stuM, () => q("select email, phone from public.profiles where id = $1", [facM]))).length === 0);
+{
+  const mine = await asUser(stuM, () => q("select * from public.my_facilitator()"));
+  check("my_facilitator() tells a student who their facilitator is", mine.length === 1 && mine[0].id === facM && mine[0].first_name === "facM" && mine[0].gender === "male");
+  check("...and returns only id, name and gender", mine.length === 1 && Object.keys(mine[0]).sort().join() === "first_name,gender,id,last_name");
+  check("a student with no facilitator gets nobody", (await asUser(stuM2, () => q("select * from public.my_facilitator()"))).length === 0);
+  check("a facilitator calling my_facilitator() gets nobody", (await asUser(facM, () => q("select * from public.my_facilitator()"))).length === 0);
+  await db.exec("reset role; set role anon;");
+  const anon = await tryQ("select * from public.my_facilitator()");
+  await db.exec("reset role");
+  check("anonymous users can't call my_facilitator()", !!anon.error);
+}
 check("a facilitator sees students but not other facilitators", (await asUser(facM, () => q("select role from public.profiles"))).every((p) => ["student", "facilitator"].includes(p.role)) && (await asUser(facM, () => q("select id from public.profiles where role='facilitator'"))).length === 1);
 check("a student sees only their own attendance", (await asUser(stuM, () => q("select id from public.attendance_logs"))).length === 1);
 r = await asUser(stuM, () => tryQ("insert into public.attendance_logs (campus_id, student_id, log_date, scanned_by, entry_method) values ($1,$2,'2000-01-01',$2,'manual')", [c1, stuM]));

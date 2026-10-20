@@ -12,7 +12,7 @@ The full specification is in [PROJECT_SPECIFICATION.md](PROJECT_SPECIFICATION.md
 | Super Admin (IT) | Campuses, programs, all users, direct password resets, system logs |
 | Campus Head | Creates facilitators/students, scans attendance, watches each student's consistency (**Attendance sheet**), reviews/locks the daily report, sends it to the Google Form |
 | Facilitator | Scans attendance, registers first timers, records engagement, chats with same-gender students |
-| Student | Own QR card, assigned facilitator, attendance history, chat |
+| Student | Own QR card, their facilitator's **name** and availability (not their email or phone), attendance history, chat |
 
 Students are assigned automatically to the first facilitator who adds them to a batch.
 

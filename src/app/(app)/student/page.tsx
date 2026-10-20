@@ -6,8 +6,9 @@ import { QrCard } from "@/components/qr/qr-card";
 import { Button } from "@/components/ui/button";
 import { getCampus, requireRole } from "@/lib/auth";
 import { DAY_NAMES } from "@/lib/dates";
+import { getMyFacilitator } from "@/lib/my-facilitator";
 import { createClient } from "@/lib/supabase/server";
-import { fullName, type Profile } from "@/lib/types";
+import { fullName } from "@/lib/types";
 
 export const metadata: Metadata = { title: "My card" };
 
@@ -28,16 +29,13 @@ export default async function StudentHome() {
   const campus = await getCampus(profile.campus_id);
   const supabase = await createClient();
 
-  const [{ data: program }, { data: assignment }] = await Promise.all([
+  const [{ data: program }, facilitator] = await Promise.all([
     profile.program_id
       ? supabase.from("programs").select("code, name").eq("id", profile.program_id).maybeSingle<{ code: string; name: string }>()
       : Promise.resolve({ data: null }),
-    supabase.from("facilitator_students").select("facilitator_id").eq("student_id", profile.id).eq("is_active", true).maybeSingle<{ facilitator_id: string }>(),
+    getMyFacilitator(supabase),
   ]);
 
-  const { data: facilitator } = assignment
-    ? await supabase.from("profiles").select("*").eq("id", assignment.facilitator_id).maybeSingle<Profile>()
-    : { data: null };
   const { data: slotRows } = facilitator
     ? await supabase
         .from("facilitator_availability")
@@ -78,18 +76,6 @@ export default async function StudentHome() {
           {facilitator ? (
             <>
               <p className="mt-3 text-2xl font-bold tracking-tight">{fullName(facilitator)}</p>
-              <dl className="mt-3 grid gap-2 text-sm">
-                {facilitator.phone ? (
-                  <div className="flex gap-2">
-                    <dt className="w-16 text-muted-foreground">Phone</dt>
-                    <dd>{facilitator.phone}</dd>
-                  </div>
-                ) : null}
-                <div className="flex gap-2">
-                  <dt className="w-16 text-muted-foreground">Email</dt>
-                  <dd className="break-all">{facilitator.email}</dd>
-                </div>
-              </dl>
 
               <h3 className="mt-5 text-sm font-semibold">When they&apos;re available</h3>
               {slots.length === 0 ? (

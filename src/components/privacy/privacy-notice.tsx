@@ -70,8 +70,8 @@ export function PrivacyNotice() {
         </ul>
         <p>
           Each campus is kept separate: a Campus Head only sees their own campus. A student only sees their own
-          information and their facilitator&apos;s name and contact details. Reports sent to the wider ministry contain
-          totals only, never students&apos; names.
+          information and their facilitator&apos;s name; their facilitator&apos;s email, phone number and other personal
+          details stay private. Reports sent to the wider ministry contain totals only, never students&apos; names.
         </p>
       </Section>
 

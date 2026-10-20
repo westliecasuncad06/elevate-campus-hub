@@ -214,6 +214,15 @@ try {
   const ownDel = await head1.client.from("campus_google_forms").delete().eq("id", addForm.data?.id).select("id");
   check("a Campus Head can remove their form", (ownDel.data ?? []).length === 1, ownDel.error?.message);
 
+  console.log("\nStudents and their facilitator's details");
+  const peek = await stuM.client.from("profiles").select("id, email, phone, birthday").eq("id", facM.id);
+  check("a student cannot read their facilitator's email, phone or birthday", (peek.data ?? []).length === 0);
+  const mine = await stuM.client.rpc("my_facilitator");
+  const mineRow = Array.isArray(mine.data) ? mine.data[0] : mine.data;
+  check("my_facilitator() gives a student the facilitator's name and gender only", !mine.error && mineRow?.id === facM.id && Object.keys(mineRow ?? {}).sort().join() === "first_name,gender,id,last_name", mine.error?.message);
+  check("a student with no facilitator gets nobody", ((await stuM2.client.rpc("my_facilitator")).data ?? []).length === 0);
+  check("a facilitator gets nobody from my_facilitator()", ((await facM.client.rpc("my_facilitator")).data ?? []).length === 0);
+
   console.log("\nSame-gender chat");
   const send = (from, to, text) => from.client.from("chat_messages").insert({ sender_id: from.id, receiver_id: to.id, campus_id: c1, message: text }).select("id").single();
   let m = await send(facM, stuM, "hello");
