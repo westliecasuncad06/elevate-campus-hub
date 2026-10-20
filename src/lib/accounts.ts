@@ -1,4 +1,5 @@
 import "server-only";
+import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIVACY_VERSION } from "@/lib/privacy";
@@ -7,8 +8,25 @@ import type { Profile, Role } from "@/lib/types";
 
 type Result<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
 
-function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/**
+ * The public address invitation links should open: NEXT_PUBLIC_SITE_URL when it's set, otherwise the address this
+ * very request came in on (so an app running on Vercel never builds links that point at localhost).
+ */
+async function siteUrl(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (host) {
+      const proto = h.get("x-forwarded-proto") ?? (/^(localhost|127\.)/.test(host) ? "http" : "https");
+      return `${proto}://${host}`;
+    }
+  } catch {
+    // Not inside a request (a script): fall through.
+  }
+  return "http://localhost:3000";
 }
 
 function friendlyAuthError(message: string): string {
@@ -55,7 +73,7 @@ export async function createAccount(params: {
   }
 
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(fields.email, {
-    redirectTo: `${siteUrl()}/auth/confirm`,
+    redirectTo: `${await siteUrl()}/auth/confirm`,
     data: { first_name: fields.firstName, last_name: fields.lastName },
   });
   if (inviteError || !invited.user) {
@@ -112,7 +130,7 @@ export async function resendInvitation(profile: Pick<Profile, "id" | "email" | "
   }
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.inviteUserByEmail(profile.email, {
-    redirectTo: `${siteUrl()}/auth/confirm`,
+    redirectTo: `${await siteUrl()}/auth/confirm`,
     data: { first_name: profile.first_name, last_name: profile.last_name },
   });
 
@@ -127,7 +145,7 @@ export async function resendInvitation(profile: Pick<Profile, "id" | "email" | "
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const { error: resetError } = await anon.auth.resetPasswordForEmail(profile.email, {
-      redirectTo: `${siteUrl()}/auth/confirm`,
+      redirectTo: `${await siteUrl()}/auth/confirm`,
     });
     if (resetError) return { ok: false, error: friendlyAuthError(resetError.message) };
   }

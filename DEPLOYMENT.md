@@ -93,7 +93,7 @@ site must be deployed and the Supabase **Site URL** must be its address. If a ma
 | Symptom | Fix |
 |---|---|
 | "Almost there: connect Supabase" page | The two `NEXT_PUBLIC_SUPABASE_*` variables are missing or still placeholders. Add them and redeploy. |
-| Invitation button opens `localhost` | `NEXT_PUBLIC_SITE_URL` or the Supabase **Site URL** is still `http://localhost:3000`. |
+| Invitation button opens `localhost` | Three things decide the address, all must be the Vercel URL: (1) Supabase → Authentication → URL Configuration → **Site URL** (the email button is built from it), (2) `NEXT_PUBLIC_SITE_URL` in **Vercel** (if it is missing the app uses the address the request came in on), (3) send the invitation **from the deployed site**, not from `npm run dev`: a local app uses your local `.env.local`. Hover the email button to see where it points; old emails keep their old address, so send a new invitation. |
 | Invitation link says it expired / redirects to login | Add the Vercel address to Supabase **Redirect URLs**; links are single-use. |
 | Sign-in loops or logs you out | Check the `SUPABASE_SERVICE_ROLE_KEY` and that the Site URL is `https`. |
 | Cron shows 401 | `CRON_SECRET` is missing in Vercel. Add it (Production) and redeploy. |
