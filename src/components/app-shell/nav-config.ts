@@ -9,6 +9,7 @@ import {
   Home,
   IdCard,
   LayoutList,
+  ListChecks,
   MessageCircle,
   ScrollText,
   Settings2,
@@ -41,6 +42,7 @@ export const NAV: Record<Role, NavItem[]> = {
   campus_head: [
     { href: "/campus-head", label: "Today", icon: LayoutList, batches: true },
     { href: "/campus-head/students", label: "Students", icon: GraduationCap },
+    { href: "/campus-head/roster", label: "Roster", icon: ListChecks },
     { href: "/campus-head/facilitators", label: "Facilitators", icon: Users },
     { href: "/campus-head/live", label: "Live", icon: ActivityIcon },
     { href: "/campus-head/history", label: "History", icon: HistoryIcon },

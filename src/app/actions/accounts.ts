@@ -54,7 +54,8 @@ export async function createAccountAction(
   if (!result.ok) return result;
 
   refresh();
-  return { ok: true, message: `Invitation sent to ${parsed.value.email}.` };
+  const matched = result.rosterMatch ? ` Matched to the roster as ${result.rosterMatch}.` : "";
+  return { ok: true, message: `Invitation sent to ${parsed.value.email}.${matched}` };
 }
 
 /**

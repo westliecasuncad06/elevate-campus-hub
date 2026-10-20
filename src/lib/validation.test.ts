@@ -44,6 +44,27 @@ describe("parseAccountForm (student)", () => {
   it("rejects a bad email", () => {
     expect(parseAccountForm("student", form({ ...student, email: "maria@" }), "2026-03-11").ok).toBe(false);
   });
+
+  it("saves a surname typed in capitals as 'Surname'", () => {
+    const result = parseAccountForm("student", form({ ...student, first_name: "James", last_name: "JARDIN" }), "2026-03-11");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.firstName).toBe("James");
+      expect(result.value.lastName).toBe("Jardin");
+    }
+  });
+
+  it("fixes capitals in both names and leaves normal names alone", () => {
+    const shouted = parseAccountForm("student", form({ ...student, first_name: "MARIA CRISTINA", last_name: "DELA CRUZ" }), "2026-03-11");
+    const normal = parseAccountForm("student", form({ ...student, first_name: "Maria", last_name: "McDonald" }), "2026-03-11");
+    expect(shouted.ok && shouted.value.firstName + " " + shouted.value.lastName).toBe("Maria Cristina Dela Cruz");
+    expect(normal.ok && normal.value.lastName).toBe("McDonald");
+  });
+
+  it("does the same for staff", () => {
+    const result = parseAccountForm("facilitator", form({ first_name: "Ana", last_name: "REYES", email: "a@x.com", gender: "female", privacy_consent: "on" }), "2026-03-11");
+    expect(result.ok && result.value.lastName).toBe("Reyes");
+  });
 });
 
 describe("course: pick a program, or type it at a campus with no program list", () => {

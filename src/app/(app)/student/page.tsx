@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MessageCircleIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { QrCard } from "@/components/qr/qr-card";
+import { YearLevelCard } from "@/components/student/year-level-card";
 import { Button } from "@/components/ui/button";
 import { getCampus, requireRole } from "@/lib/auth";
 import { DAY_NAMES } from "@/lib/dates";
@@ -70,6 +71,7 @@ export default async function StudentHome() {
           </p>
         )}
 
+        <div className="grid gap-6">
         <section aria-labelledby="facilitator-heading" className="rounded-2xl border bg-card p-5">
           <h2 id="facilitator-heading" className="text-lg font-semibold">
             Your facilitator
@@ -112,6 +114,8 @@ export default async function StudentHome() {
             </p>
           )}
         </section>
+        <YearLevelCard yearLevel={profile.year_level} />
+        </div>
       </div>
     </>
   );

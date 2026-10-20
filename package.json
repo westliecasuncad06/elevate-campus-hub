@@ -13,6 +13,8 @@
     "db:migrate": "node --env-file=.env.local scripts/db-migrate.mjs",
     "supabase:email-templates": "node --env-file=.env.local scripts/apply-email-templates.mjs",
     "seed:admin": "node --env-file=.env.local scripts/seed-super-admin.mjs",
+    "names:fix": "node --env-file=.env.local --import tsx scripts/fix-name-case.mjs",
+    "roster:import":"node --env-file=.env.local --import tsx scripts/import-roster.mjs",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo-accounts.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs"
   },

@@ -1,3 +1,4 @@
+import { formatName } from "@/lib/names";
 import { looksLikeEmail, normalizePhone } from "@/lib/phone";
 import type { Gender, Role } from "@/lib/types";
 
@@ -39,8 +40,9 @@ function optional(formData: FormData, key: string): string | null {
 /** Validates the registration/creation (or edit) form for any account type. */
 export function parseAccountForm(role: Role, formData: FormData, today: string, options: ParseOptions = {}): Parsed {
   const { courseMode = "program", requireConsent = true } = options;
-  const firstName = text(formData, "first_name");
-  const lastName = text(formData, "last_name");
+  // A surname typed in capitals by accident ("JARDIN") is saved as "Jardin".
+  const firstName = formatName(text(formData, "first_name"));
+  const lastName = formatName(text(formData, "last_name"));
   if (!firstName || !lastName) return { ok: false, error: "First name and last name are required." };
   if (firstName.length > 80 || lastName.length > 80) return { ok: false, error: "Names must be 80 characters or fewer." };
 

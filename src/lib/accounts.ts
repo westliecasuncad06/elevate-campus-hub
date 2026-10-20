@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIVACY_VERSION } from "@/lib/privacy";
 import { placeholderName } from "@/lib/registration";
+import { claimRosterName } from "@/lib/roster-claim";
 import type { AccountFields } from "@/lib/validation";
 import type { Profile, Role } from "@/lib/types";
 
@@ -50,7 +51,7 @@ export async function createAccount(params: {
   campusId: string | null;
   fields: AccountFields;
   createdBy: string;
-}): Promise<Result<{ profileId: string }>> {
+}): Promise<Result<{ profileId: string; rosterMatch: string | null }>> {
   const { role, campusId, fields, createdBy } = params;
   const admin = createAdminClient();
 
@@ -122,7 +123,11 @@ export async function createAccount(params: {
     return { ok: false, error: profileError.message };
   }
 
-  return { ok: true, profileId: userId };
+  // A student whose name is already on the campus roster is linked to that name.
+  const rosterMatch =
+    role === "student" && campusId ? await claimRosterName(admin, campusId, userId, fields.firstName, fields.lastName) : null;
+
+  return { ok: true, profileId: userId, rosterMatch };
 }
 
 /**

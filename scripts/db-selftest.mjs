@@ -237,6 +237,43 @@ check("a finished batch can't be reopened by editing the table", !r.rows?.length
   check("campuses no longer have a single form link column", (await q("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'campuses' and column_name = 'google_form_url'")).length === 0);
 }
 
+// Campus roster (migration 0015): names loaded before the students have accounts, read-only from the app
+{
+  console.log("\nRoster");
+  const ins = (campus, name, key) => q("insert into public.roster_students (campus_id, full_name, name_key, gender, year_level, course) values ($1,$2,$3,'female',2,'BSBA') returning id", [campus, name, key]);
+  const [{ id: rosterId }] = await ins(c1, "Aisa Doon", "aisa doon");
+  await ins(c1, "Irish Nicole Abordo", "abordo irish nicole");
+  await ins(c2, "Other Campus Student", "campus other student");
+
+  const dupe = await tryQ("insert into public.roster_students (campus_id, full_name, name_key) values ($1,'Aisa  Doon','aisa doon')", [c1]);
+  check("the same name can't be listed twice in one campus", !!dupe.error);
+  check("...but another campus can list it", !(await tryQ("insert into public.roster_students (campus_id, full_name, name_key) values ($1,'Aisa Doon','aisa doon')", [c2])).error);
+
+  check("a Campus Head sees only their own campus's roster", (await asUser(head1, () => q("select id from public.roster_students"))).length === 2);
+  check("another campus's head sees only theirs", (await asUser(head2, () => q("select id from public.roster_students"))).length === 2);
+  check("the Super Admin sees every roster", (await asUser(admin, () => q("select id from public.roster_students"))).length === 4);
+  check("a facilitator sees the roster of the campus they work at", (await asUser(facM, () => q("select id from public.roster_students"))).length === 2);
+  check("a student can't see the roster", (await asUser(stuM, () => q("select id from public.roster_students"))).length === 0);
+  check("anonymous users can't read the roster", (await (async () => { await db.exec("reset role; set role anon;"); const x = await tryQ("select id from public.roster_students"); await db.exec("reset role"); return x.rows ?? []; })()).length === 0);
+
+  for (const [who, label] of [[head1, "a Campus Head"], [facM, "a facilitator"], [stuM, "a student"], [admin, "the Super Admin (the app uses the service role instead)"]]) {
+    const w = await asUser(who, () => tryQ("update public.roster_students set full_name = 'Changed' where id = $1 returning id", [rosterId]));
+    const d = await asUser(who, () => tryQ("delete from public.roster_students where id = $1 returning id", [rosterId]));
+    const i = await asUser(who, () => tryQ("insert into public.roster_students (campus_id, full_name, name_key) values ($1,'Sneaky Person','person sneaky')", [c1]));
+    check(`${label} can't change the roster directly`, !!w.error && !!d.error && !!i.error, "a write was allowed");
+  }
+
+  // Linking: one account per roster name, and deleting the account frees the name
+  // A throwaway student, so the other fixtures (and the numbers checked further down) are untouched.
+  const claimer = await mkUser("rosterClaimer", "student", c1, "female");
+  await q("update public.roster_students set claimed_by = $1, claimed_at = now() where id = $2", [claimer, rosterId]);
+  const second = (await q("select id from public.roster_students where campus_id = $1 and name_key = 'abordo irish nicole'", [c1]))[0].id;
+  check("an account can be linked to only one roster name", !!(await tryQ("update public.roster_students set claimed_by = $1 where id = $2", [claimer, second])).error);
+  check("a linked name shows who it belongs to", (await q("select claimed_by from public.roster_students where id = $1", [rosterId]))[0].claimed_by === claimer);
+  await q("delete from public.profiles where id = $1", [claimer]);
+  check("deleting the linked account frees the roster name", (await q("select claimed_by from public.roster_students where id = $1", [rosterId]))[0].claimed_by === null);
+}
+
 const totals = (await asUser(head1, () => q("select * from public.compute_daily_report($1, $2::date)", [c1, todayManila])))[0];
 // 4 students attended (stuM, stuF, stuM3 via facM; stuM2 via the Campus Head). stuM: engaged+gospel+accepted+dgroup,
 // stuF: not engaged, stuM3: engaged+gospel. Volunteers = facilitators who added someone: only facM (a Campus Head doesn't count).

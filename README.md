@@ -52,6 +52,31 @@ Two things to set in Supabase (the code comes from Supabase's email OTP, so they
 - **Authentication → Providers → Email → Email OTP Length: 6** (a new project defaults to 8; the app accepts 6 to 10 digits), and
   pick how long a code stays valid (**Email OTP Expiration**), for example a day.
 
+### Student roster (names loaded before accounts exist)
+
+A campus can already have its students' names on an attendance sheet. IT loads that list into the **roster**, and the Campus
+Head sees it under **Roster** (everyone, who has registered and who hasn't, with a search and a **Remove** button for a name
+listed twice or someone who left). When a student is registered, by a facilitator, a Campus Head or as a first-timer, with a
+name that matches a roster name, the two are **linked automatically** and the success message says so. Matching ignores the
+order of the words ("Abordo, Irish Nicole" = "Irish Nicole Abordo"), capital letters, accents, middle initials and "Jr."; it only
+links an **exact** match of the remaining words, so two different people are never mixed up. Deleting the account frees the name.
+The roster only carries names, gender and the year/course written on the sheet; attendance is recorded in the app as usual and
+belongs to the student's account.
+
+Load or refresh a roster (IT, from the project folder; needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`):
+
+```bash
+npm run roster:import -- --campus GRC --url "https://docs.google.com/spreadsheets/d/<id>/edit?gid=<tab>" --dry-run
+npm run roster:import -- --campus GRC --url "https://docs.google.com/spreadsheets/d/<id>/edit?gid=<tab>"
+```
+
+The sheet must be shared as "Anyone with the link can view" (or saved as CSV and loaded with `--file roster.csv`). The first
+column is **Name**; **Gender** and **Year Level / Course** are used when present, the date columns are ignored. Run it again
+whenever the sheet grows: names already on the roster are not overwritten, and existing accounts with a matching name are linked.
+
+Students can change their own **year level** from **My card**; every other detail is changed by their facilitator or Campus Head.
+Names typed in capitals by accident ("JARDIN") are saved as "Jardin" everywhere a name is entered.
+
 ### Signing in with Google
 
 The sign-in page also has **Continue with Google**, so people don't have to remember a password. It appears by itself once the
