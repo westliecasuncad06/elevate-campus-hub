@@ -52,6 +52,22 @@ Supabase → **Authentication → URL Configuration**:
 While testing, invitation emails always point at the **Site URL**. Switch it back to `http://localhost:3000` only if you
 are testing invitations locally.
 
+### The branded emails (invitation and password)
+
+Supabase sends these emails, and their design lives in Supabase, not in this repo. Two ways to apply
+[docs/email-templates/](docs/email-templates/):
+
+- **By hand**: Supabase → **Authentication → Email Templates** → *Invite user* and *Reset password*: paste the subject and the HTML
+  (from the `<!doctype html>` line down) of `invite.html` / `recovery.html`.
+- **By script**: create an access token (Supabase → your account → **Access Tokens**), put it in `.env.local` as
+  `SUPABASE_ACCESS_TOKEN=`, then run `npm run supabase:email-templates`. To also set the Site URL and allowed Redirect
+  URLs from step 3: `node --env-file=.env.local scripts/apply-email-templates.mjs --site-url https://<project-name>.vercel.app`.
+  The token can manage all your Supabase projects, so delete it afterwards.
+
+The logo and tagline in the email are images from this website (`/brand/email-header.png`, `/brand/email-tagline.png`), so the
+site must be deployed and the Supabase **Site URL** must be its address. If a mail app blocks images the alt text still reads
+"Elevate Campus Hub".
+
 ## 4. Check it works
 
 1. Open the address: you should see the landing page. **Sign in** with a real account.

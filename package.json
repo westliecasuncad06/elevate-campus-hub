@@ -11,6 +11,7 @@
     "db:bundle": "node scripts/bundle-sql.mjs",
     "db:selftest": "node scripts/db-selftest.mjs",
     "db:migrate": "node --env-file=.env.local scripts/db-migrate.mjs",
+    "supabase:email-templates": "node --env-file=.env.local scripts/apply-email-templates.mjs",
     "seed:admin": "node --env-file=.env.local scripts/seed-super-admin.mjs",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo-accounts.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs"
