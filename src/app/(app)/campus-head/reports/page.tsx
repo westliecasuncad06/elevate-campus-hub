@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { PageHeader, StatCard } from "@/components/page-header";
 import { DailyReportForm, type ReportNumbers } from "@/components/reports/daily-report-form";
-import { GoogleFormPanel } from "@/components/reports/google-form-panel";
+import { GoogleFormPanel, type SendableForm } from "@/components/reports/google-form-panel";
+import { ManageFormsDialog, type SavedForm } from "@/components/reports/manage-forms-dialog";
 import { SendReportPanel } from "@/components/reports/send-report-panel";
 import { FIELD_LABEL } from "@/lib/google-form";
 import { Field, SubmitButton } from "@/components/forms";
@@ -35,7 +36,7 @@ interface Submission {
   total_attendees: number;
   target_google_doc_url: string | null;
   submitted_at: string;
-  payload: { error?: string } | null;
+  payload: { error?: string; form_name?: string } | null;
 }
 
 const ZERO: ReportNumbers = {
@@ -67,7 +68,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
   const to = pick("to", date);
 
   const supabase = await createClient();
-  const [calc, savedRes, summaryRes, submissionsRes, lastDoc, formSent] = await Promise.all([
+  const [calc, savedRes, summaryRes, submissionsRes, lastDoc, formsRes, sentRes, lastFormRes] = await Promise.all([
     supabase.rpc("compute_daily_report", { p_campus_id: profile.campus_id, p_date: date }),
     supabase.from("daily_reports").select("*").eq("campus_id", profile.campus_id).eq("report_date", date).maybeSingle<SavedReport>(),
     from <= to
@@ -86,16 +87,27 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
       .order("submitted_at", { ascending: false })
       .limit(1)
       .maybeSingle<{ target_google_doc_url: string }>(),
+    supabase.from("campus_google_forms").select("id, name, url").order("created_at"),
+    // Which forms this day has already been sent to (newest first, so the first match per form is the latest).
     supabase
       .from("report_submissions")
-      .select("submitted_at")
+      .select("target_google_form_url, submitted_at")
       .eq("submission_type", "google_form")
       .eq("status", "submitted")
       .eq("date_from", date)
       .eq("date_to", date)
+      .order("submitted_at", { ascending: false }),
+    // The form last sent to successfully, so it is already selected. (A failed try doesn't count: the default would
+    // change under the person's feet right after an error.)
+    supabase
+      .from("report_submissions")
+      .select("target_google_form_url")
+      .eq("submission_type", "google_form")
+      .eq("status", "submitted")
+      .not("target_google_form_url", "is", null)
       .order("submitted_at", { ascending: false })
       .limit(1)
-      .maybeSingle<{ submitted_at: string }>(),
+      .maybeSingle<{ target_google_form_url: string }>(),
   ]);
 
   const calculated = one<ReportNumbers>(calc.data) ?? ZERO;
@@ -105,6 +117,18 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
   const defaultDocUrl =
     lastDoc.data?.target_google_doc_url ??
     (campus?.target_google_doc_id ? `https://docs.google.com/document/d/${campus.target_google_doc_id}/edit` : "");
+
+  const sentAtByUrl = new Map<string, string>();
+  for (const row of (sentRes.data ?? []) as { target_google_form_url: string | null; submitted_at: string }[]) {
+    if (row.target_google_form_url && !sentAtByUrl.has(row.target_google_form_url)) {
+      sentAtByUrl.set(row.target_google_form_url, row.submitted_at);
+    }
+  }
+  const forms: SendableForm[] = ((formsRes.data ?? []) as SavedForm[]).map((f) => {
+    const sent = sentAtByUrl.get(f.url);
+    return { ...f, sentAt: sent ? formatDateTime(sent, timezone) : null };
+  });
+  const defaultFormId = forms.find((f) => f.url === lastFormRes.data?.target_google_form_url)?.id ?? forms[0]?.id ?? null;
 
   const location = saved?.location?.trim() || campus?.report_location?.trim() || campus?.name || "";
   const formAnswers = saved
@@ -160,28 +184,31 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
       </section>
 
       <section className="mb-10" aria-labelledby="form-heading">
-        <h2 id="form-heading" className="mb-1 text-lg font-semibold">
-          Send to the Google Form
-        </h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Submits {formatDate(date)} to your ministry’s report form, using the saved numbers above.
-        </p>
-        {!campus?.google_form_url ? (
-          <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-            No Google Form link is set for this campus yet. Ask the Super Admin to add it under Campuses.
-          </p>
-        ) : !saved ? (
-          <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-            Save the daily report for this day first. Then you can send it to the form.
-          </p>
-        ) : (
-          <GoogleFormPanel
-            key={`${date}-${formSent.data?.submitted_at ?? "new"}`}
-            date={date}
-            answers={formAnswers}
-            sentAt={formSent.data ? formatDateTime(formSent.data.submitted_at, timezone) : null}
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="form-heading" className="mb-1 text-lg font-semibold">
+              Send to a Google Form
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Submits {formatDate(date)} to the form you pick, using the saved numbers above.
+            </p>
+          </div>
+          {/* Not inside the keyed panel below: that remounts whenever the forms change, which would close this dialog. */}
+          <ManageFormsDialog
+            forms={forms}
+            triggerLabel={forms.length === 0 ? "Add a Google Form" : "Manage forms"}
+            triggerVariant={forms.length === 0 ? "default" : "outline"}
           />
-        )}
+        </div>
+        <GoogleFormPanel
+          // Remounts when the saved forms or their send times change, so the choice and "send again" start fresh.
+          key={`${date}-${saved ? "saved" : "new"}-${defaultFormId}-${forms.map((f) => `${f.id}:${f.sentAt ?? ""}`).join("|")}`}
+          date={date}
+          answers={formAnswers}
+          forms={forms}
+          defaultFormId={defaultFormId}
+          hasReport={Boolean(saved)}
+        />
       </section>
 
       <section className="mb-10" aria-labelledby="send-heading">
@@ -252,7 +279,12 @@ export default async function ReportsPage({ searchParams }: PageProps<"/campus-h
                 {submissions.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.report_title}</TableCell>
-                    <TableCell>{s.submission_type === "google_docs" ? "Google Doc" : "Google Form"}</TableCell>
+                    <TableCell>
+                      {s.submission_type === "google_docs" ? "Google Doc" : "Google Form"}
+                      {s.submission_type === "google_form" && s.payload?.form_name ? (
+                        <p className="max-w-48 truncate text-xs text-muted-foreground">{s.payload.form_name}</p>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="tabular-nums">{s.total_attendees}</TableCell>
                     <TableCell>
                       <Badge variant={s.status === "submitted" ? "secondary" : s.status === "failed" ? "destructive" : "outline"}>

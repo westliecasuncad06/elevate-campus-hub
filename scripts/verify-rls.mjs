@@ -71,7 +71,7 @@ async function makeUser(key, role, campusId, gender) {
 
 async function cleanup() {
   // Child rows first: attendance/engagement/report rows reference the test users, which blocks deleting them.
-  for (const table of ["chat_messages", "batch_students", "engagement_batches", "engagement_logs", "report_submissions", "daily_reports", "attendance_logs", "facilitator_students"]) {
+  for (const table of ["chat_messages", "batch_students", "engagement_batches", "engagement_logs", "report_submissions", "campus_google_forms", "daily_reports", "attendance_logs", "facilitator_students"]) {
     if (created.campuses.length === 0) break;
     const { error } = await admin.from(table).delete().in("campus_id", created.campuses);
     if (error) console.warn(`  cleanup warning (${table}): ${error.message}`);
@@ -193,6 +193,26 @@ try {
   }
   const cross = await head2.client.from("daily_reports").select("id").eq("campus_id", c1);
   check("another campus's head cannot read this campus's reports", (cross.data ?? []).length === 0);
+
+  console.log("\nSaved Google Forms");
+  const formUrl = `https://docs.google.com/forms/d/e/RLSTEST${run}/viewform`;
+  const addForm = await head1.client.from("campus_google_forms").insert({ campus_id: c1, name: "Weekly report", url: formUrl, created_by: head1.id }).select("id").single();
+  check("a Campus Head can save a Google Form for their campus", !addForm.error, addForm.error?.message);
+  const dupForm = await head1.client.from("campus_google_forms").insert({ campus_id: c1, name: "Again", url: formUrl });
+  check("the same form can't be saved twice", !!dupForm.error);
+  const badForm = await head1.client.from("campus_google_forms").insert({ campus_id: c1, name: "Not Google", url: "https://example.com/forms/d/e/x/viewform" });
+  check("only Google Form addresses can be saved", !!badForm.error);
+  const crossForm = await head2.client.from("campus_google_forms").insert({ campus_id: c1, name: "Sneaky", url: `${formUrl}?x=1` });
+  check("another campus's head can't save a form for this campus", !!crossForm.error);
+  check("another campus's head can't see this campus's forms", ((await head2.client.from("campus_google_forms").select("id")).data ?? []).length === 0);
+  check("a facilitator can't see saved forms", ((await facM.client.from("campus_google_forms").select("id")).data ?? []).length === 0);
+  check("a student can't see saved forms", ((await stuM.client.from("campus_google_forms").select("id")).data ?? []).length === 0);
+  const facForm = await facM.client.from("campus_google_forms").insert({ campus_id: c1, name: "Nope", url: `${formUrl}?y=1` });
+  check("a facilitator can't save a form", !!facForm.error);
+  const otherDel = await head2.client.from("campus_google_forms").delete().eq("id", addForm.data?.id).select("id");
+  check("another campus's head can't remove this campus's form", (otherDel.data ?? []).length === 0);
+  const ownDel = await head1.client.from("campus_google_forms").delete().eq("id", addForm.data?.id).select("id");
+  check("a Campus Head can remove their form", (ownDel.data ?? []).length === 1, ownDel.error?.message);
 
   console.log("\nSame-gender chat");
   const send = (from, to, text) => from.client.from("chat_messages").insert({ sender_id: from.id, receiver_id: to.id, campus_id: c1, message: text }).select("id").single();

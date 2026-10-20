@@ -50,14 +50,34 @@ The ministry's "Elevate Engagement Report" Google Form asks for the Date, School
 the Gospel, accepted Jesus, are willing to join a Dgroup, and volunteers. **Daily report** fills all seven from the saved day
 (*Engaged/Attendees* is the day's total attendance), shows them in a preview, and **Send to Google Form** submits them.
 
-- **School/Location** is editable per report and defaults to the campus's setting (GRC: "Global Reciprocal Colleges").
-- The Super Admin sets the form link and default School/Location under **Campuses → Edit**.
+- **School/Location** is editable per report and defaults to the campus's setting (GRC: "Global Reciprocal Colleges", set by
+  the Super Admin under **Campuses → Edit**).
+- **Saved forms:** the Campus Head keeps a list of Google Forms (**Manage forms** → paste the form's link, optionally a name;
+  the form's own title is used if you leave it empty). Each link is **checked before it is saved**: it must be reachable,
+  accept responses without a Google sign-in, and ask only questions the system can answer. Pick which form to send to from
+  the **Send to** list (the one you last sent to successfully is pre-selected).
 - The app reads the form's questions when it sends, so it keeps working if Google renumbers the question IDs. If the
   questions are changed so much that they can't be matched, it refuses and tells you instead of sending partial data.
-- A day that was already sent needs a ticked **Send again**, so the sheet doesn't get an accidental duplicate row.
-- Every attempt (sent or failed) is listed under **Sent reports** and in the system logs.
+- A day that was already sent **to that form** needs a ticked **Send again**, so the sheet doesn't get an accidental duplicate
+  row. Sending the same day to a different saved form is fine.
+- Every attempt (sent or failed) is listed under **Sent reports**, with the form's name, and in the system logs.
+- **Copy report** copies the numbers on screen as plain text to paste into a chat:
 
-> **Already ran `setup.sql` before this?** Run `npm run db:migrate` to apply `0008_form_report_and_attendance_sheet.sql`.
+  ```
+  Campus Hub
+  October 20, 2026
+
+  Total Attendance: 37
+  No. of Students Engaged: 18
+  No. of Students who hear the Gospel: 12
+  No. of Students who accepted Jesus: 12
+  No. of Students who wants to join a D-Group: 0
+  No. of Volunteers: 6
+  ```
+  The wording lives in `src/lib/report-text.ts` if it ever needs to change.
+
+> **Already ran `setup.sql` before this?** Run `npm run db:migrate` to apply `0008_form_report_and_attendance_sheet.sql` and
+> `0009_saved_google_forms.sql` (which moves any form link a campus already had into the saved-forms list).
 
 ### Notifications
 
@@ -164,7 +184,7 @@ Sign in as the Super Admin, then: **Users → Add campus head** for GRC.
 ### 5. Google reports (optional until you need them)
 
 **Google Form:** nothing to deploy. The form must accept responses without a Google sign-in (don't tick "Limit to 1 response"
-or "Restrict to users in your organisation"), and its link goes in **Campuses → Edit**.
+or "Restrict to users in your organisation"). The Campus Head saves its link on the **Daily report** page (**Manage forms**).
 
 **Google Doc** (adds a summary for a date range to a document) needs the Apps Script below:
 

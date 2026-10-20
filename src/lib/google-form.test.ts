@@ -5,7 +5,9 @@ import {
   formAddresses,
   isConfirmation,
   mapFormFields,
+  normalizeFormUrl,
   parseFormFields,
+  parseFormTitle,
   type FormValues,
 } from "./google-form";
 
@@ -20,7 +22,8 @@ const items = [
   [1725297844, "No. of Volunteers", null, 0, [[1877585668, null, 0]]],
   [111, "A section heading", null, 8],
 ];
-const html = `<html><script>var FB_PUBLIC_LOAD_DATA_ = ${JSON.stringify([null, ["Hello", items]])};</script></html>`;
+// Index 1 holds the questions; index 3 is the form's title (as in the real page).
+const html = `<html><head><title>Elevate Engagement Report - Google Forms</title></head><script>var FB_PUBLIC_LOAD_DATA_ = ${JSON.stringify([null, ["Hello", items], "/forms", "Elevate Engagement Report"])};</script></html>`;
 
 const values: FormValues = {
   date: "2026-10-23",
@@ -45,6 +48,36 @@ describe("extractFormId / formAddresses", () => {
     expect(extractFormId("https://example.com/forms")).toBeNull();
     expect(extractFormId("https://docs.google.com/document/d/abc/edit")).toBeNull();
     expect(formAddresses("")).toBeNull();
+  });
+});
+
+describe("normalizeFormUrl", () => {
+  it("turns any pasted form link into the one address we store", () => {
+    const id = "1FAIpQLSdFavVf16RNMbL2pOXLQEXfGlkls-G5X3u3njI9LsToL_mcHQ";
+    const canonical = `https://docs.google.com/forms/d/e/${id}/viewform`;
+    expect(normalizeFormUrl(`https://docs.google.com/forms/d/e/${id}/viewform?usp=dialog`)).toBe(canonical);
+    expect(normalizeFormUrl(`https://docs.google.com/forms/d/e/${id}/formResponse`)).toBe(canonical);
+    expect(normalizeFormUrl(canonical)).toBe(canonical);
+  });
+
+  it("returns null for anything that isn't a published form link", () => {
+    expect(normalizeFormUrl("https://docs.google.com/forms/d/abc/edit")).toBeNull(); // an editor link has no response address
+    expect(normalizeFormUrl("https://example.com/not-a-form")).toBeNull();
+    expect(normalizeFormUrl("")).toBeNull();
+  });
+});
+
+describe("parseFormTitle", () => {
+  it("reads the title from the form's data", () => {
+    expect(parseFormTitle(html)).toBe("Elevate Engagement Report");
+  });
+
+  it("falls back to the page title, without the Google Forms suffix", () => {
+    expect(parseFormTitle("<title>Weekly check-in - Google Forms</title>")).toBe("Weekly check-in");
+  });
+
+  it("is null when the page says nothing", () => {
+    expect(parseFormTitle("<html></html>")).toBeNull();
   });
 });
 

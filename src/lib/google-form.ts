@@ -49,19 +49,35 @@ export function formAddresses(url: string): { view: string; response: string } |
   return { view: `${base}/viewform`, response: `${base}/formResponse` };
 }
 
+/** The one canonical address we store for a form, whatever extras ("?usp=dialog", "/edit") the pasted link had. */
+export function normalizeFormUrl(url: string): string | null {
+  return formAddresses(url)?.view ?? null;
+}
+
+/** The JSON Google embeds in the form page (questions, title, …), or null if the page isn't a form. */
+function parseFormData(html: string): unknown[] | null {
+  const match = html.match(/FB_PUBLIC_LOAD_DATA_\s*=\s*(\[[\s\S]*?\])\s*;\s*<\/script>/);
+  if (!match) return null;
+  try {
+    const data = JSON.parse(match[1]);
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The form's title, for naming a saved form. */
+export function parseFormTitle(html: string): string | null {
+  const embedded = parseFormData(html)?.[3];
+  if (typeof embedded === "string" && embedded.trim()) return embedded.trim();
+  const tag = html.match(/<title>([^<]*)<\/title>/i)?.[1]?.replace(/\s+-\s+Google Forms\s*$/i, "").trim();
+  return tag || null;
+}
+
 /** Reads the questions out of the form page's embedded data. */
 export function parseFormFields(html: string): FormField[] {
-  const match = html.match(/FB_PUBLIC_LOAD_DATA_\s*=\s*(\[[\s\S]*?\])\s*;\s*<\/script>/);
-  if (!match) return [];
-
-  let data: unknown;
-  try {
-    data = JSON.parse(match[1]);
-  } catch {
-    return [];
-  }
-
-  const items = (data as unknown[][])?.[1]?.[1];
+  const data = parseFormData(html);
+  const items = (data as unknown[][] | null)?.[1]?.[1];
   if (!Array.isArray(items)) return [];
 
   const fields: FormField[] = [];
@@ -152,8 +168,21 @@ const BROWSER_HEADERS = {
 
 export type SubmitResult = { ok: true } | { ok: false; error: string };
 
-/** Reads the live form, fills it in, and submits it. */
-export async function submitToGoogleForm(formUrl: string, values: FormValues): Promise<SubmitResult> {
+const SIGN_IN = /accounts\.google\.com\/(ServiceLogin|v3\/signin)/;
+const SIGN_IN_ERROR = "The form needs a Google sign-in. Set it to accept responses from anyone with the link.";
+const CLOSED_ERROR = "The form is closed and no longer accepting responses.";
+
+export interface LoadedForm {
+  addresses: { view: string; response: string };
+  title: string | null;
+  map: Partial<Record<FieldKey, FormField>>;
+  /** Questions the form requires that the system can't answer. */
+  missing: string[];
+  fbzx: string | null;
+}
+
+/** Fetches the live form and works out which of its questions we can answer. */
+export async function loadForm(formUrl: string): Promise<{ ok: true; form: LoadedForm } | { ok: false; error: string }> {
   const addresses = formAddresses(formUrl);
   if (!addresses) {
     return { ok: false, error: "That isn't a Google Form link. It should look like docs.google.com/forms/d/e/…/viewform." };
@@ -162,38 +191,57 @@ export async function submitToGoogleForm(formUrl: string, values: FormValues): P
   try {
     const page = await fetch(addresses.view, { headers: BROWSER_HEADERS, redirect: "follow", signal: AbortSignal.timeout(20_000) });
     const html = await page.text();
-    if (page.status === 404) {
-      return { ok: false, error: "Google couldn't find that form. Check the Google Form link under Campuses." };
-    }
-    if (!page.ok || /accounts\.google\.com\/(ServiceLogin|v3\/signin)/.test(page.url)) {
-      return { ok: false, error: "The form needs a Google sign-in. Set it to accept responses from anyone with the link." };
-    }
-    if (/no longer accepting responses/i.test(html)) {
-      return { ok: false, error: "The form is closed and no longer accepting responses." };
-    }
+    if (page.status === 404) return { ok: false, error: "Google couldn't find that form. Check the link." };
+    if (!page.ok || SIGN_IN.test(page.url)) return { ok: false, error: SIGN_IN_ERROR };
+    if (/no longer accepting responses/i.test(html)) return { ok: false, error: CLOSED_ERROR };
 
     const fields = parseFormFields(html);
     if (fields.length === 0) return { ok: false, error: "Couldn't read the questions from the form. Check the link." };
 
     const { map, missing } = mapFormFields(fields);
-    if (missing.length > 0) {
-      return { ok: false, error: `The form asks for something the system doesn't have: ${missing.join(", ")}.` };
-    }
+    return {
+      ok: true,
+      form: { addresses, title: parseFormTitle(html), map, missing, fbzx: html.match(/name="fbzx"\s+value="([^"]+)"/)?.[1] ?? null },
+    };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Couldn't reach Google Forms." };
+  }
+}
 
-    const fbzx = html.match(/name="fbzx"\s+value="([^"]+)"/)?.[1] ?? null;
-    const response = await fetch(addresses.response, {
+export type InspectResult = { ok: true; url: string; title: string | null } | { ok: false; error: string };
+
+/** Checks a pasted link before it is saved: it must be a reachable form whose questions we can answer. */
+export async function inspectGoogleForm(formUrl: string): Promise<InspectResult> {
+  const loaded = await loadForm(formUrl);
+  if (!loaded.ok) return loaded;
+  const { form } = loaded;
+  if (form.missing.length > 0) {
+    return { ok: false, error: `This form asks for something the system doesn't have: ${form.missing.join(", ")}.` };
+  }
+  return { ok: true, url: form.addresses.view, title: form.title };
+}
+
+/** Reads the live form, fills it in, and submits it. */
+export async function submitToGoogleForm(formUrl: string, values: FormValues): Promise<SubmitResult> {
+  const loaded = await loadForm(formUrl);
+  if (!loaded.ok) return loaded;
+  const { form } = loaded;
+  if (form.missing.length > 0) {
+    return { ok: false, error: `The form asks for something the system doesn't have: ${form.missing.join(", ")}.` };
+  }
+
+  try {
+    const response = await fetch(form.addresses.response, {
       method: "POST",
       headers: { ...BROWSER_HEADERS, "Content-Type": "application/x-www-form-urlencoded" },
-      body: buildFormBody(map, values, fbzx),
+      body: buildFormBody(form.map, values, form.fbzx),
       redirect: "follow",
       signal: AbortSignal.timeout(20_000),
     });
     const result = await response.text();
 
-    if (/no longer accepting responses/i.test(result)) return { ok: false, error: "The form is closed and no longer accepting responses." };
-    if (/accounts\.google\.com\/(ServiceLogin|v3\/signin)/.test(response.url)) {
-      return { ok: false, error: "The form needs a Google sign-in. Set it to accept responses from anyone with the link." };
-    }
+    if (/no longer accepting responses/i.test(result)) return { ok: false, error: CLOSED_ERROR };
+    if (SIGN_IN.test(response.url)) return { ok: false, error: SIGN_IN_ERROR };
     if (isConfirmation(response.status, result)) return { ok: true };
     return { ok: false, error: "Google didn't accept the response (the form may have changed). Nothing was recorded." };
   } catch (error) {

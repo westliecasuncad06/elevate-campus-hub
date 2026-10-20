@@ -196,6 +196,34 @@ check("a finished batch can't be reopened by editing the table", !r.rows?.length
   check("an empty range returns nothing", none.length === 0);
 }
 
+// Saved Google Forms (migration 0009): the Campus Head of a campus manages that campus's forms, nobody else
+{
+  const url = "https://docs.google.com/forms/d/e/1FAIpQLSdSELFTESTSELFTEST/viewform";
+  const add = await asUser(head1, () => tryQ("insert into public.campus_google_forms (campus_id, name, url, created_by) values ($1, 'Weekly report', $2, $3) returning id", [c1, url, head1]));
+  check("a Campus Head can save a Google Form for their campus", !add.error && add.rows.length === 1, add.error);
+  const formId = add.rows?.[0]?.id;
+
+  const dupe = await asUser(head1, () => tryQ("insert into public.campus_google_forms (campus_id, name, url) values ($1, 'Same again', $2)", [c1, url]));
+  check("the same form can't be saved twice for one campus", !!dupe.error);
+  const notGoogle = await asUser(head1, () => tryQ("insert into public.campus_google_forms (campus_id, name, url) values ($1, 'Fake', 'https://example.com/forms/d/e/abc/viewform')", [c1]));
+  check("only Google Form addresses can be saved", !!notGoogle.error);
+  const noName = await asUser(head1, () => tryQ("insert into public.campus_google_forms (campus_id, name, url) values ($1, '   ', 'https://docs.google.com/forms/d/e/BLANKNAME/viewform')", [c1]));
+  check("a form needs a name", !!noName.error);
+
+  check("another campus's head can't save a form for this campus", !!(await asUser(head2, () => tryQ("insert into public.campus_google_forms (campus_id, name, url) values ($1, 'Sneaky', 'https://docs.google.com/forms/d/e/SNEAKY/viewform')", [c1]))).error);
+  check("another campus's head can't see this campus's forms", (await asUser(head2, () => q("select id from public.campus_google_forms"))).length === 0);
+  check("the Super Admin can see saved forms", (await asUser(admin, () => q("select id from public.campus_google_forms"))).length === 1);
+  check("a facilitator can't see saved forms", (await asUser(facM, () => q("select id from public.campus_google_forms"))).length === 0);
+  check("a student can't see saved forms", (await asUser(stuM, () => q("select id from public.campus_google_forms"))).length === 0);
+  check("a facilitator can't save a form", !!(await asUser(facM, () => tryQ("insert into public.campus_google_forms (campus_id, name, url) values ($1, 'Nope', 'https://docs.google.com/forms/d/e/NOPE/viewform')", [c1]))).error);
+
+  const other = await asUser(head2, () => tryQ("delete from public.campus_google_forms where id = $1 returning id", [formId]));
+  check("another campus's head can't delete this campus's form", !other.error && other.rows.length === 0);
+  const del = await asUser(head1, () => tryQ("delete from public.campus_google_forms where id = $1 returning id", [formId]));
+  check("a Campus Head can remove their form", !del.error && del.rows.length === 1, del.error);
+  check("campuses no longer have a single form link column", (await q("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'campuses' and column_name = 'google_form_url'")).length === 0);
+}
+
 const totals = (await asUser(head1, () => q("select * from public.compute_daily_report($1, $2::date)", [c1, todayManila])))[0];
 // 4 students attended (stuM, stuF, stuM3 via facM; stuM2 via the Campus Head). stuM: engaged+gospel+accepted+dgroup,
 // stuF: not engaged, stuM3: engaged+gospel. Volunteers = facilitators who added someone: only facM (a Campus Head doesn't count).

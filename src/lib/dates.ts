@@ -45,4 +45,14 @@ export function formatDate(date: string | null | undefined): string {
   }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
+/** "October 20, 2026" for a plain YYYY-MM-DD date, without shifting it across timezones. */
+export function formatLongDate(date: string | null | undefined): string {
+  if (!date) return "—";
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return date;
+  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" }).format(
+    new Date(Date.UTC(y, m - 1, d)),
+  );
+}
+
 export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;

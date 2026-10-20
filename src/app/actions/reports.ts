@@ -11,6 +11,7 @@ import { fullName, type ActionResult } from "@/lib/types";
 
 const FORBIDDEN: ActionResult = { ok: false, error: "Only the Campus Head can do that." };
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Totals {
   total_attendance: number;
@@ -216,14 +217,18 @@ export async function submitFormReportAction(_prev: ActionResult | null, formDat
   if (!actor?.campus_id) return FORBIDDEN;
   const campus = await getCampus(actor.campus_id);
   if (!campus) return { ok: false, error: "Your campus couldn't be found." };
-  if (!campus.google_form_url) {
-    return { ok: false, error: "This campus has no Google Form link yet. Ask the Super Admin to add it under Campuses." };
-  }
 
   const date = String(formData.get("report_date") ?? "");
   if (!DATE.test(date)) return { ok: false, error: "Pick a valid date." };
 
   const supabase = await createClient();
+  // Row-level security limits this to the campus's own saved forms.
+  const formId = String(formData.get("form_id") ?? "");
+  const { data: form } = UUID.test(formId)
+    ? await supabase.from("campus_google_forms").select("id, name, url").eq("id", formId).maybeSingle<{ id: string; name: string; url: string }>()
+    : { data: null };
+  if (!form) return { ok: false, error: "Pick one of your saved Google Forms to send to." };
+
   const { data: day } = await supabase
     .from("daily_reports")
     .select("*")
@@ -237,6 +242,7 @@ export async function submitFormReportAction(_prev: ActionResult | null, formDat
     .select("submitted_at")
     .eq("campus_id", campus.id)
     .eq("submission_type", "google_form")
+    .eq("target_google_form_url", form.url)
     .eq("status", "submitted")
     .eq("date_from", date)
     .eq("date_to", date)
@@ -246,7 +252,7 @@ export async function submitFormReportAction(_prev: ActionResult | null, formDat
   if (previous && formData.get("again") !== "on") {
     return {
       ok: false,
-      error: `This day was already sent on ${formatDateTime(previous.submitted_at, campus.timezone)}. Tick “Send again” if you want a second entry.`,
+      error: `This day was already sent to “${form.name}” on ${formatDateTime(previous.submitted_at, campus.timezone)}. Tick “Send again” if you want a second entry.`,
     };
   }
 
@@ -268,39 +274,39 @@ export async function submitFormReportAction(_prev: ActionResult | null, formDat
       date_from: date,
       date_to: date,
       total_attendees: day.total_attendance,
-      target_google_form_url: campus.google_form_url,
+      target_google_form_url: form.url,
       submission_type: "google_form",
       status: "pending",
-      payload: values,
+      payload: { ...values, form_name: form.name },
       submitted_by: actor.id,
     })
     .select("id")
     .single<{ id: string }>();
   if (insertError || !row) return { ok: false, error: insertError?.message ?? "Could not record the submission." };
 
-  const result = await submitToGoogleForm(campus.google_form_url, values);
+  const result = await submitToGoogleForm(form.url, values);
 
   const admin = createAdminClient();
   if (result.ok) {
     await supabase.from("report_submissions").update({ status: "submitted" }).eq("id", row.id);
     await admin.from("system_logs").insert({
       event: "report_submitted",
-      detail: { campus: campus.code, kind: "google_form", from: date, to: date, by: actor.id },
+      detail: { campus: campus.code, kind: "google_form", form: form.name, from: date, to: date, by: actor.id },
     });
   } else {
     await supabase
       .from("report_submissions")
-      .update({ status: "failed", payload: { ...values, error: result.error } })
+      .update({ status: "failed", payload: { ...values, form_name: form.name, error: result.error } })
       .eq("id", row.id);
     await admin.from("system_logs").insert({
       event: "report_failed",
       level: "error",
-      detail: { campus: campus.code, kind: "google_form", from: date, to: date, error: result.error },
+      detail: { campus: campus.code, kind: "google_form", form: form.name, from: date, to: date, error: result.error },
     });
   }
 
   revalidatePath("/campus-head/reports");
   return result.ok
-    ? { ok: true, message: "Sent to the Google Form." }
+    ? { ok: true, message: `Sent to “${form.name}”.` }
     : { ok: false, error: `Couldn't send it: ${result.error}` };
 }

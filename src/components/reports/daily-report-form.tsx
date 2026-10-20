@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useFormAction } from "@/components/use-form-action";
-import { LockIcon, LockOpenIcon, RotateCcwIcon } from "lucide-react";
+import { CopyIcon, LockIcon, LockOpenIcon, RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormMessage, SubmitButton } from "@/components/forms";
 import { saveDailyReportAction, setReportLockAction } from "@/app/actions/reports";
+import { copyText } from "@/lib/clipboard";
+import { formatReportText } from "@/lib/report-text";
 
 export interface ReportNumbers {
   total_attendance: number;
@@ -29,6 +31,13 @@ const FIELDS: { key: keyof ReportNumbers; label: string }[] = [
   { key: "volunteers_count", label: "Volunteers" },
 ];
 
+type Draft = Record<keyof ReportNumbers, string>;
+
+function toDraft(numbers: ReportNumbers): Draft {
+  // `numbers` can be a whole database row, so take only the six counts.
+  return Object.fromEntries(FIELDS.map(({ key }) => [key, String(numbers[key])])) as Draft;
+}
+
 /** Review the day's numbers, adjust them if needed, save, and lock. */
 export function DailyReportForm({
   date,
@@ -46,13 +55,26 @@ export function DailyReportForm({
   notes: string | null;
   locked: boolean;
 }) {
-  const [values, setValues] = useState<ReportNumbers>(saved ?? calculated);
+  // Kept as text while typing, so a box can be emptied and retyped. Turning every keystroke into a number put the
+  // "0" straight back whenever the box was cleared.
+  const [values, setValues] = useState<Draft>(() => toDraft(saved ?? calculated));
   const { state, pending, formProps } = useFormAction(saveDailyReportAction);
   const [lockPending, startLock] = useTransition();
 
   useEffect(() => {
     if (state?.ok) toast.success(state.message ?? "Saved.");
   }, [state]);
+
+  /** Copies the numbers on screen as the ministry's plain-text report, ready to paste into a chat. */
+  async function copyReport() {
+    if (FIELDS.some(({ key }) => values[key] === "")) {
+      toast.error("Fill in every number first.");
+      return;
+    }
+    const counts = Object.fromEntries(FIELDS.map(({ key }) => [key, Number(values[key])])) as unknown as ReportNumbers;
+    if (await copyText(formatReportText(date, counts))) toast.success("Report copied. Paste it where you need it.");
+    else toast.error("Couldn't copy. Your browser blocked it.");
+  }
 
   function toggleLock() {
     startLock(async () => {
@@ -81,21 +103,27 @@ export function DailyReportForm({
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {FIELDS.map(({ key, label }) => {
-          const edited = values[key] !== calculated[key];
+          const edited = values[key] !== "" && Number(values[key]) !== calculated[key];
           return (
             <div key={key} className="grid gap-1.5">
               <Label htmlFor={key}>{label}</Label>
               <Input
                 id={key}
                 name={key}
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={0}
-                step={1}
+                autoComplete="off"
+                pattern="[0-9]{1,6}"
+                title="A whole number, 0 or higher"
                 required
                 disabled={locked}
                 value={values[key]}
-                onChange={(e) => setValues({ ...values, [key]: Number(e.target.value) })}
+                // Digits only; the box may be empty while the person types the new number.
+                onChange={(e) => setValues({ ...values, [key]: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+                // Selecting everything on focus means typing replaces the old number.
+                onFocus={(e) => e.target.select()}
+                // "007" -> "7" once they leave the box.
+                onBlur={() => values[key] !== "" && setValues({ ...values, [key]: String(Number(values[key])) })}
                 className="tabular-nums"
               />
               <p className="text-xs text-muted-foreground">
@@ -119,7 +147,7 @@ export function DailyReportForm({
             <SubmitButton pending={pending} pendingText="Saving…">
               Save report
             </SubmitButton>
-            <Button type="button" variant="outline" onClick={() => setValues(calculated)}>
+            <Button type="button" variant="outline" onClick={() => setValues(toDraft(calculated))}>
               <RotateCcwIcon />
               Reset to counted numbers
             </Button>
@@ -128,6 +156,10 @@ export function DailyReportForm({
         <Button type="button" variant={locked ? "secondary" : "outline"} disabled={lockPending} onClick={toggleLock}>
           {locked ? <LockOpenIcon /> : <LockIcon />}
           {locked ? "Unlock report" : "Lock report"}
+        </Button>
+        <Button type="button" variant="outline" onClick={copyReport}>
+          <CopyIcon />
+          Copy report
         </Button>
       </div>
     </form>

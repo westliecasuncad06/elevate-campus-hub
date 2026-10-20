@@ -82,7 +82,7 @@ site must be deployed and the Supabase **Site URL** must be its address. If a ma
 - [ ] Remove the demo accounts (`demo.*@example.test`): Super Admin → Users → Deactivate, or delete them in Supabase.
 - [ ] Change the database password (Supabase → Project Settings → Database) and update `SUPABASE_DB_URL` locally.
 - [ ] Have your Data Protection Officer / legal counsel review the notice in `src/lib/privacy.ts` (then bump `PRIVACY_VERSION`).
-- [ ] Check **Campuses → Edit** has the report Google Form link and School/Location for each campus (GRC is already set), and that the form accepts responses without a sign-in.
+- [ ] Check **Campuses → Edit** has the School/Location for each campus (GRC is already set). Each Campus Head saves their Google Form(s) on the Daily report page (**Manage forms**); GRC's is already saved, and it must accept responses without a sign-in.
 - [ ] Send one real report from **Daily report → Send to Google Form** and check it arrives in the form's responses.
 - [ ] Only if you use "Send to a Google Doc": set up the Google Apps Script (`docs/google-apps-script/Code.gs`) and add `GOOGLE_APPS_SCRIPT_WEBHOOK_URL`.
 - [ ] Paste the branded email templates (`docs/email-templates/`) into Supabase if you haven't.
