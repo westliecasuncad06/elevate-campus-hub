@@ -28,6 +28,8 @@ export interface AccountDefaults {
   course?: string | null;
   year_level?: number | null;
   student_number?: string | null;
+  /** A facilitator's other campuses (the ones besides campus_id). */
+  extra_campus_ids?: string[];
 }
 
 /**
@@ -75,6 +77,36 @@ export function AccountFields({
           required
           className="sm:col-span-2"
         />
+      ) : null}
+      {campuses && mode === "edit" && role === "facilitator" ? (
+        <fieldset className="grid gap-2 rounded-lg border p-3 sm:col-span-2">
+          <legend className="px-1 text-sm font-medium">Also works at</legend>
+          <p className="text-xs text-muted-foreground">
+            A facilitator can work at more than one school. Tick every other campus they go to (the campus above is where they
+            work now; they switch between them from the top bar). Each campus keeps its own Campus Head. A campus you untick ends
+            their student assignments there.
+          </p>
+          {campuses.filter((c) => c.value !== campusId).length === 0 ? (
+            <p className="text-sm text-muted-foreground">There are no other campuses yet.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {campuses
+                .filter((c) => c.value !== campusId)
+                .map((c) => (
+                  <label key={c.value} className="flex cursor-pointer items-center gap-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      name="extra_campus_ids"
+                      value={c.value}
+                      defaultChecked={defaults?.extra_campus_ids?.includes(c.value)}
+                      className="size-5 accent-[var(--primary)]"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+            </div>
+          )}
+        </fieldset>
       ) : null}
       <Field label="First name" name="first_name" defaultValue={defaults?.first_name} autoComplete="off" required />
       <Field label="Last name" name="last_name" defaultValue={defaults?.last_name} autoComplete="off" required />

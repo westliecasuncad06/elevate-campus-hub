@@ -1,4 +1,5 @@
 import { AppShell, type BatchNavData } from "@/components/app-shell/app-shell";
+import type { SwitchableCampus } from "@/components/app-shell/campus-switcher";
 import { getCampus, requireProfile } from "@/lib/auth";
 import { getMyOpenBatches, pickBatch } from "@/lib/my-batches";
 import { loadNotificationFeed } from "@/lib/notifications";
@@ -36,12 +37,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const campusLabel = campus ? `${campus.code} · ${campus.name}` : "All campuses";
 
+  // A facilitator who works at more than one campus gets a switcher for the one they are at right now.
+  let campusSwitch: SwitchableCampus[] | null = null;
+  if (profile.role === "facilitator") {
+    const { data } = await supabase.rpc("my_campuses");
+    const options = (data ?? []) as SwitchableCampus[];
+    if (options.length > 1) campusSwitch = options;
+  }
+
   return (
     <AppShell
       role={profile.role}
       userId={profile.id}
       userName={fullName(profile)}
       campusLabel={campusLabel}
+      campusSwitch={campusSwitch}
       unreadChat={unreadChat}
       batchNav={batchNav}
       notifications={notifications}

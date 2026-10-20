@@ -27,7 +27,7 @@ function shortTime(t: string) {
 }
 
 export default async function FacilitatorsPage() {
-  await requireRole("campus_head");
+  const actor = await requireRole("campus_head");
   const supabase = await createClient();
 
   const [{ data: facilitatorRows }, { data: assignments }, { data: availabilityRows }] = await Promise.all([
@@ -82,6 +82,8 @@ export default async function FacilitatorsPage() {
             <TableBody>
               {facilitators.map((f) => {
                 const slots = availability.get(f.id) ?? [];
+                // Facilitators work at several schools. One set to another school right now is still on this team.
+                const elsewhere = f.campus_id !== actor.campus_id;
                 return (
                   <TableRow key={f.id} className={f.is_active ? undefined : "opacity-60"}>
                     <TableCell>
@@ -89,6 +91,9 @@ export default async function FacilitatorsPage() {
                       <p className="text-xs text-muted-foreground">
                         {f.gender === "male" ? "Male" : "Female"} · {f.phone ?? f.email}
                       </p>
+                      {elsewhere ? (
+                        <p className="mt-0.5 text-xs font-medium text-brand-ink">Also works at another campus</p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="tabular-nums">{studentCount.get(f.id) ?? 0}</TableCell>
                     <TableCell className="max-w-xs text-sm">
@@ -109,10 +114,16 @@ export default async function FacilitatorsPage() {
                       <AccountStatusBadge profile={f} />
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {isPending(f) ? <ResendInviteButton profileId={f.id} /> : null}
-                        <ActiveToggleButton profileId={f.id} active={f.is_active} />
-                      </div>
+                      {elsewhere ? (
+                        // Their account is managed by the Super Admin (and the campus they are set to): deactivating it
+                        // here would also switch them off at their other schools.
+                        <p className="text-right text-xs text-muted-foreground">Managed by IT</p>
+                      ) : (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {isPending(f) ? <ResendInviteButton profileId={f.id} /> : null}
+                          <ActiveToggleButton profileId={f.id} active={f.is_active} />
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

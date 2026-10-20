@@ -39,8 +39,10 @@ and **Live** (who is facilitating right now and who they're with; refreshes ever
 - **Edit** changes any of the person's details (name, email, phone, gender, birthday, and for students the course, year, church,
   religion and student number). Changing the **email** changes their login email too.
 - **Campus and role.** Any Campus Head, facilitator or student can be moved to another campus. A Campus Head or facilitator can
-  also become the other role, at any campus, which is how one person ends up heading a different campus. (A person belongs to
-  one campus at a time. Students stay students, and Super Admins have no campus.)
+  also become the other role, at any campus. Students stay students, and Super Admins have no campus.
+- **Facilitators can work at several campuses.** In **Edit**, a facilitator has the campus they work at now plus an **Also works
+  at** list: tick every other school they go to. Campus Heads and students belong to exactly one campus, and each campus keeps
+  its own Campus Head. Unticking a campus ends the facilitator's student assignments there (and only there).
   - Their current student assignments end, because they only make sense inside one campus and one role. Those students are
     matched with a facilitator again at their next meeting. Past attendance stays with the campus where it happened.
   - They must have no open batch (and a student must not be in one): finish it first. If a move is refused, nothing changes.
@@ -49,6 +51,19 @@ and **Live** (who is facilitating right now and who they're with; refreshes ever
   facilitator who has recorded attendance, run a batch or sent a report **can't be deleted**, because those records carry their
   name: **Deactivate** them instead, which keeps the history. You can't delete yourself or another Super Admin.
 - Every change is written to the system logs (which fields changed, never the values).
+
+#### A facilitator at several campuses
+
+- A **campus switcher** appears in the top bar (only for facilitators with more than one campus). Everything on screen (Today,
+  batches, students, attendance) is for the campus selected there. Switching needs **no open batch**: a batch belongs to the
+  campus it was started at, so finish it first.
+- **My students** and **Chat** include the students assigned to the facilitator at every campus they work at, so a message from
+  a student at another school isn't lost while they're at a different one.
+- Each campus's **Campus Head** sees the facilitators who work there (**Facilitators** page, availability, assigning students),
+  even while those are set to another campus. Such a facilitator is marked "Also works at another campus", and can only be
+  deactivated by the Super Admin, because that would switch them off at every school.
+- Under the hood, `profiles.campus_id` is "the campus I'm working at right now", and `profile_campuses` lists the others, so every
+  existing batch, attendance and permission rule works unchanged for whichever campus is selected.
 
 ### Programs and courses
 
@@ -105,8 +120,8 @@ the Gospel, accepted Jesus, are willing to join a Dgroup, and volunteers. **Dail
 
 > **Already ran `setup.sql` before this?** Run `npm run db:migrate` to apply `0008_form_report_and_attendance_sheet.sql` and
 > `0009_saved_google_forms.sql` (which moves any form link a campus already had into the saved-forms list). Later migrations
-> (`0010`–`0012`: facilitator privacy, programs per campus with typed courses, and moving people between campuses) are applied the
-> same way.
+> (`0010`–`0013`: facilitator privacy, programs per campus with typed courses, moving people between campuses, and facilitators
+> working at several campuses) are applied the same way.
 
 ### Notifications
 

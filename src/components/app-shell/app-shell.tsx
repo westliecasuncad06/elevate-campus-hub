@@ -7,6 +7,7 @@ import { EllipsisIcon, KeyRoundIcon, LogOutIcon } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { AddBatchButton } from "@/components/batch/add-batch-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { CampusSwitcher, type SwitchableCampus } from "./campus-switcher";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL } from "@/lib/roles";
@@ -27,6 +28,8 @@ interface AppShellProps {
   userId: string;
   userName: string;
   campusLabel: string;
+  /** A facilitator who works at several campuses switches between them here; null for everyone else. */
+  campusSwitch: SwitchableCampus[] | null;
   unreadChat: number;
   batchNav: BatchNavData | null;
   notifications: NotificationFeed;
@@ -107,7 +110,17 @@ function SignOutForm({ className }: { className?: string }) {
   );
 }
 
-export function AppShell({ role, userId, userName, campusLabel, unreadChat, batchNav, notifications, children }: AppShellProps) {
+export function AppShell({
+  role,
+  userId,
+  userName,
+  campusLabel,
+  campusSwitch,
+  unreadChat,
+  batchNav,
+  notifications,
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const items = NAV[role];
   const [moreOpen, setMoreOpen] = useState(false);
@@ -165,10 +178,16 @@ export function AppShell({ role, userId, userName, campusLabel, unreadChat, batc
         {/* Black bar on phones, light bar on desktop */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 bg-sidebar px-4 py-2.5 text-white lg:border-b lg:bg-background/90 lg:px-8 lg:text-foreground lg:backdrop-blur">
           <Brand tone="dark" className="lg:hidden [&_p:first-child]:text-base" />
-          <p className="hidden text-sm text-muted-foreground lg:block">{campusLabel}</p>
+          {campusSwitch ? (
+            // Pushed to the left on desktop (where the campus name normally sits) and sits beside the logo on phones.
+            <CampusSwitcher options={campusSwitch} className="mr-auto" />
+          ) : (
+            <p className="hidden text-sm text-muted-foreground lg:block">{campusLabel}</p>
+          )}
           <div className="flex items-center gap-3">
             <NotificationBell userId={userId} initial={notifications} />
-            <div className="text-right leading-tight">
+            {/* On a phone the campus switcher needs the room, so the name waits for a wider screen. */}
+            <div className={cn("text-right leading-tight", campusSwitch && "hidden sm:block")}>
               <p className="text-sm font-semibold">{userName}</p>
               <p className="text-xs text-white/60 lg:text-muted-foreground">
                 {ROLE_LABEL[role]}

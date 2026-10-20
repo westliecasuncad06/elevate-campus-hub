@@ -233,6 +233,29 @@ try {
   const openFac = await admin.rpc("admin_move_user", { p_user: busyFac.id, p_role: "facilitator", p_campus: c2 });
   check("a facilitator with an open batch can't be moved", !!openFac.error && /open batch/.test(openFac.error.message), openFac.error?.message ?? "no error");
 
+  console.log("\nFacilitators working at several campuses");
+  const multiFac = await makeUser("multiFac", "facilitator", c1, "male");
+  const addCampus = await admin.rpc("admin_move_user", { p_user: multiFac.id, p_role: "facilitator", p_campus: c1, p_extra: [c2] });
+  check("the server can add a campus to a facilitator", !addCampus.error && addCampus.data?.changed === true, addCampus.error?.message);
+  check("the Campus Head of the added campus sees them", ((await head2.client.from("profiles").select("id").eq("id", multiFac.id)).data ?? []).length === 1);
+  check("a facilitator doesn't see other facilitators", ((await facM.client.from("profiles").select("id").eq("id", multiFac.id)).data ?? []).length === 0);
+  check("a Campus Head sees the extra-campus list only for their own campus", ((await head2.client.from("profile_campuses").select("campus_id")).data ?? []).length === 1 && ((await head1.client.from("profile_campuses").select("campus_id")).data ?? []).length === 0);
+  const listTry = await multiFac.client.from("profile_campuses").insert({ profile_id: multiFac.id, campus_id: c1 });
+  check("nobody can edit the list from the app", !!listTry.error);
+  const myList = await multiFac.client.rpc("my_campuses");
+  check("my_campuses() lists the current campus first, then the others", !myList.error && myList.data?.length === 2 && myList.data[0].is_current === true && myList.data[1].is_current === false, myList.error?.message);
+  const sw = await multiFac.client.rpc("switch_my_campus", { p_campus: c2 });
+  check("a facilitator can switch to a campus they work at", !sw.error && sw.data?.changed === true, sw.error?.message);
+  check("...and it becomes their current campus", (await admin.from("profiles").select("campus_id").eq("id", multiFac.id).single()).data?.campus_id === c2);
+  check("...which Campus Head 2 now sees them under (and Campus Head 1 still does)", ((await head1.client.from("profiles").select("id").eq("id", multiFac.id)).data ?? []).length === 1);
+  const swBack = await multiFac.client.rpc("switch_my_campus", { p_campus: c1 });
+  check("they can switch back", !swBack.error && swBack.data?.changed === true, swBack.error?.message);
+  check("a facilitator can't switch to a campus they don't work at", !!(await facM.client.rpc("switch_my_campus", { p_campus: c2 })).error);
+  check("a Campus Head can't switch campus", !!(await head1.client.rpc("switch_my_campus", { p_campus: c2 })).error);
+  check("a student can't switch campus", !!(await stuM.client.rpc("switch_my_campus", { p_campus: c2 })).error);
+  const extraTry = await head1.client.rpc("admin_move_user", { p_user: multiFac.id, p_role: "facilitator", p_campus: c1, p_extra: [] });
+  check("only the server can set a facilitator's campuses", !!extraTry.error);
+
   console.log("\nStudents and their facilitator's details");
   const peek = await stuM.client.from("profiles").select("id, email, phone, birthday").eq("id", facM.id);
   check("a student cannot read their facilitator's email, phone or birthday", (peek.data ?? []).length === 0);

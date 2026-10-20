@@ -432,5 +432,109 @@ console.log("\nTyped courses and moving people (migrations 0011, 0012)");
   check("anonymous users can't call it either", !!anonMove.error);
 }
 
+console.log("\nFacilitators working at several campuses (migration 0013)");
+{
+  const move = (u, role, campus, extra = []) =>
+    tryQ("select public.admin_move_user($1::uuid, $2, $3::uuid, $4::uuid[]) as r", [u, role, campus, extra]);
+  const worksAt = async (u, campus) => (await q("select public.works_at($1::uuid, $2::uuid) as w", [u, campus]))[0].w;
+
+  const [{ id: c3 }] = await q("insert into public.campuses (code, name) values ('TS3', 'Test 3') returning id");
+  const [{ id: cOff2 }] = await q("insert into public.campuses (code, name, is_active) values ('OF2', 'Closed 2', false) returning id");
+  const multi = await mkUser("multi", "facilitator", c1, "female");
+  const multiS1 = await mkUser("multiS1", "student", c1, "female"); // at c1
+  const multiS2 = await mkUser("multiS2", "student", c2, "female"); // at c2
+  const multiS3 = await mkUser("multiS3", "student", c2, "female"); // at c2, NOT assigned to multi
+
+  // 1. Adding a campus
+  let m = await move(multi, "facilitator", c1, [c2]);
+  check("the Super Admin can add a campus to a facilitator", m.rows?.[0].r.changed === true && m.rows[0].r.ended_assignments === 0, m.error);
+  check("...they still work at their current campus (nothing is switched by adding)", (await q("select campus_id from public.profiles where id = $1", [multi]))[0].campus_id === c1);
+  check("works_at: current campus, an added campus, and a campus they don't work at", (await worksAt(multi, c1)) && (await worksAt(multi, c2)) && !(await worksAt(multi, c3)));
+  m = await move(multi, "facilitator", c1, [c2]);
+  check("saving the same campuses again changes nothing", m.rows?.[0].r.changed === false, m.error);
+  m = await move(multi, "facilitator", c1, [c1, c2, c2]);
+  check("the current campus and repeats in the list are ignored", m.rows?.[0].r.changed === false, m.error);
+
+  await q("insert into public.facilitator_students (facilitator_id, student_id, campus_id) values ($1,$2,$3), ($1,$4,$5)", [multi, multiS1, c1, multiS2, c2]);
+
+  // 2. Who can see what
+  check("a Campus Head sees a facilitator who works at their campus (though set to another)", (await asUser(head2, () => q("select id from public.profiles where id = $1", [multi]))).length === 1);
+  check("a facilitator doesn't see other facilitators", (await asUser(facM, () => q("select id from public.profiles where id = $1", [multi]))).length === 0);
+  check("the extra-campus list is visible to its own campus's Campus Head, the person and the Super Admin only",
+    (await asUser(head2, () => q("select * from public.profile_campuses"))).length === 1
+    && (await asUser(head1, () => q("select * from public.profile_campuses"))).length === 0
+    && (await asUser(multi, () => q("select * from public.profile_campuses"))).length === 1
+    && (await asUser(stuM, () => q("select * from public.profile_campuses"))).length === 0
+    && (await asUser(admin, () => q("select * from public.profile_campuses"))).length >= 1);
+  check("nobody can edit the list from the app", !!(await asUser(head2, () => tryQ("insert into public.profile_campuses (profile_id, campus_id) values ($1, $2)", [multi, c3]))).error
+    && !!(await asUser(multi, () => tryQ("delete from public.profile_campuses where profile_id = $1", [multi]))).error);
+
+  await asUser(multi, () => q("insert into public.facilitator_availability (facilitator_id, day_of_week, start_time, end_time) values ($1, 4, '09:00', '12:00')", [multi]));
+  check("both campuses' Campus Heads see the facilitator's availability", (await asUser(head2, () => q("select id from public.facilitator_availability where facilitator_id = $1", [multi]))).length === 1
+    && (await asUser(head1, () => q("select id from public.facilitator_availability where facilitator_id = $1", [multi]))).length === 1);
+
+  const seen = (await asUser(multi, () => q("select id from public.profiles where role = 'student'"))).map((p) => p.id);
+  check("a facilitator sees the students assigned to them at every campus, and no others",
+    seen.includes(multiS1) && seen.includes(multiS2) && !seen.includes(multiS3), JSON.stringify(seen));
+
+  // 3. Chat works across the campuses they work at
+  check("can_chat: a facilitator can chat with an assigned student at another campus they work at", (await q("select public.can_chat($1::uuid, $2::uuid) as c", [multi, multiS2]))[0].c === true);
+  const hi = await asUser(multi, () => tryQ("insert into public.chat_messages (sender_id, receiver_id, campus_id, message) values ($1, $2, $3, 'hi from c1')", [multi, multiS2, c1]));
+  check("...and send them a message", !hi.error, hi.error);
+  const back = await asUser(multiS2, () => tryQ("insert into public.chat_messages (sender_id, receiver_id, campus_id, message) values ($1, $2, $3, 'hello')", [multiS2, multi, c2]));
+  check("...and the student can reply", !back.error, back.error);
+
+  // 4. Switching which campus they are working at
+  check("my_campuses() lists the current campus first, then the others", JSON.stringify((await asUser(multi, () => q("select code, is_current from public.my_campuses()"))))
+    === JSON.stringify([{ code: "GRC", is_current: true }, { code: "TS2", is_current: false }]));
+  check("people who aren't facilitators get an empty list", (await asUser(head1, () => q("select * from public.my_campuses()"))).length === 0 && (await asUser(stuM, () => q("select * from public.my_campuses()"))).length === 0);
+
+  m = await asUser(multi, () => tryQ("select public.switch_my_campus($1::uuid) as r", [c2]));
+  check("a facilitator can switch to a campus they work at", m.rows?.[0].r.changed === true, m.error);
+  check("...it becomes their current campus and the old one stays on their list",
+    (await q("select campus_id from public.profiles where id = $1", [multi]))[0].campus_id === c2
+    && (await worksAt(multi, c1)) && (await q("select count(*)::int n from public.profile_campuses where profile_id = $1 and campus_id = $2", [multi, c2]))[0].n === 0);
+  check("...and their view follows: they now see campus 2's students", (await asUser(multi, () => q("select id from public.profiles where id = $1", [multiS3]))).length === 1);
+  m = await asUser(multi, () => tryQ("select public.switch_my_campus($1::uuid) as r", [c1]));
+  check("they can switch back", m.rows?.[0].r.changed === true && (await q("select campus_id from public.profiles where id = $1", [multi]))[0].campus_id === c1, m.error);
+  m = await asUser(multi, () => tryQ("select public.switch_my_campus($1::uuid) as r", [c1]));
+  check("switching to where they already are changes nothing", m.rows?.[0].r.changed === false, m.error);
+  check("they can't switch to a campus they don't work at", !!(await asUser(multi, () => tryQ("select public.switch_my_campus($1::uuid)", [c3]))).error);
+  check("only facilitators can switch", !!(await asUser(head1, () => tryQ("select public.switch_my_campus($1::uuid)", [c2]))).error && !!(await asUser(stuM, () => tryQ("select public.switch_my_campus($1::uuid)", [c2]))).error);
+  await db.exec("reset role; set role anon;");
+  const anonSwitch = await tryQ("select public.switch_my_campus($1::uuid)", [c2]);
+  await db.exec("reset role");
+  check("anonymous users can't switch", !!anonSwitch.error);
+
+  // 5. Taking a campus away ends only that campus's assignments
+  m = await move(multi, "facilitator", c1, []);
+  check("removing a campus ends the assignments there (and only there)",
+    m.rows?.[0].r.ended_assignments === 1
+    && (await q("select is_active from public.facilitator_students where facilitator_id = $1 and student_id = $2", [multi, multiS2]))[0].is_active === false
+    && (await q("select is_active from public.facilitator_students where facilitator_id = $1 and student_id = $2", [multi, multiS1]))[0].is_active === true, m.error);
+  check("...they no longer work at it, and can't chat with that student", !(await worksAt(multi, c2)) && (await q("select public.can_chat($1::uuid, $2::uuid) as c", [multi, multiS2]))[0].c === false);
+  check("...a Campus Head no longer sees them", (await asUser(head2, () => q("select id from public.profiles where id = $1", [multi]))).length === 0);
+
+  // 6. Edge cases
+  check("an inactive campus can't be added", !!(await move(multi, "facilitator", c1, [cOff2])).error);
+  const chX = await mkUser("chX", "campus_head", c1, "male");
+  m = await move(chX, "campus_head", c1, [c2]);
+  check("a Campus Head stays at one campus (extra campuses are ignored)", m.rows?.[0].r.changed === false && (await q("select count(*)::int n from public.profile_campuses where profile_id = $1", [chX]))[0].n === 0, m.error);
+  const multi2 = await mkUser("multi2", "facilitator", c1, "male");
+  await move(multi2, "facilitator", c1, [c2, c3]);
+  m = await move(multi2, "campus_head", c1, [c2, c3]);
+  check("a facilitator who becomes a Campus Head loses the extra campuses", m.rows?.[0].r.changed === true && (await q("select count(*)::int n from public.profile_campuses where profile_id = $1", [multi2]))[0].n === 0, m.error);
+
+  // 7. Open batches
+  const openB = await startBatch(multi);
+  check("a facilitator can have an open batch", !openB.error, openB.error);
+  m = await move(multi, "facilitator", c1, [c2]);
+  check("adding a campus is fine while a batch is open", m.rows?.[0].r.changed === true, m.error);
+  m = await move(multi, "facilitator", c1, []);
+  check("but taking one away needs the batch finished first", !!m.error && /open batch/.test(m.error), m.error ?? "no error");
+  m = await asUser(multi, () => tryQ("select public.switch_my_campus($1::uuid) as r", [c2]));
+  check("and so does switching campus yourself", !!m.error && /open batch/.test(m.error), m.error ?? "no error");
+}
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

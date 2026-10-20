@@ -29,6 +29,8 @@ export interface EditablePerson {
   course: string | null;
   year_level: number | null;
   student_number: string | null;
+  /** A facilitator's other campuses (besides campus_id). */
+  extra_campus_ids: string[];
 }
 
 const STAFF_ROLES: Option[] = (["campus_head", "facilitator"] as const).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
@@ -130,8 +132,9 @@ function EditForm({
 
       {!isSuperAdmin ? (
         <p className="rounded-lg bg-secondary px-3 py-2 text-xs text-muted-foreground">
-          Moving someone to another campus, or changing their role, ends their current student assignments. They need to have
-          no open batch first. Their past attendance stays with the campus where it happened.
+          Moving someone to another campus, or changing their role, ends their current student assignments (a facilitator
+          keeps the students at every campus they still work at). They need to have no open batch first. Their past
+          attendance stays with the campus where it happened.
         </p>
       ) : null}
 

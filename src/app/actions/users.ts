@@ -12,6 +12,7 @@ import { parseAccountForm } from "@/lib/validation";
 import { fullName, type ActionResult, type Profile, type Role } from "@/lib/types";
 
 const FORBIDDEN: ActionResult = { ok: false, error: "Only a Super Admin can do that." };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NOT_FOUND: ActionResult = { ok: false, error: "That person could not be found. They may already have been deleted." };
 
 function refresh() {
@@ -59,7 +60,20 @@ export async function updateUserAction(
   }
   const campus = newCampusId ? await getCampus(newCampusId) : null;
   if (newCampusId && !campus) return { ok: false, error: "That campus couldn't be found." };
-  const moved = newRole !== target.role || newCampusId !== target.campus_id;
+
+  // A facilitator can also work at other campuses (each with its own Campus Head). Nobody else can.
+  const extraCampusIds =
+    newRole === "facilitator"
+      ? [...new Set(formData.getAll("extra_campus_ids").map(String).filter((id) => UUID.test(id) && id !== newCampusId))]
+      : [];
+  let campusesChanged = false;
+  if (newRole === "facilitator" && target.role === "facilitator") {
+    const { data: rows } = await admin.from("profile_campuses").select("campus_id").eq("profile_id", target.id);
+    const before = new Set<string | null>([target.campus_id, ...(rows ?? []).map((r) => r.campus_id as string)]);
+    const after = new Set<string | null>([newCampusId, ...extraCampusIds]);
+    campusesChanged = before.size !== after.size || [...after].some((id) => !before.has(id));
+  }
+  const moved = newRole !== target.role || newCampusId !== target.campus_id || campusesChanged;
   if (moved && campus && !campus.is_active) return { ok: false, error: "Pick an active campus." };
 
   // 2. Their details. A campus with its own programs uses the dropdown; any other campus has students type the course.
@@ -106,6 +120,7 @@ export async function updateUserAction(
       p_user: target.id,
       p_role: newRole,
       p_campus: newCampusId,
+      p_extra: extraCampusIds,
     });
     if (error) return { ok: false, error: error.message };
     endedAssignments = Number((result as { ended_assignments?: number } | null)?.ended_assignments ?? 0);
@@ -164,17 +179,27 @@ export async function updateUserAction(
       target_profile_id: target.id,
       by: actor.id,
       fields: changedFields({ ...target, email: target.email.toLowerCase() }, { ...update }),
-      ...(moved ? { from: { role: target.role, campus_id: target.campus_id }, to: { role: newRole, campus_id: newCampusId } } : {}),
+      ...(moved
+        ? {
+            from: { role: target.role, campus_id: target.campus_id },
+            to: { role: newRole, campus_id: newCampusId, also_works_at: extraCampusIds },
+          }
+        : {}),
     },
   });
 
   refresh();
   if (!moved) return { ok: true, message: "Saved." };
+
+  const alsoAt = extraCampusIds.length
+    ? ((await admin.from("campuses").select("code").in("id", extraCampusIds).order("code")).data ?? []).map((c) => c.code as string)
+    : [];
+  const where = alsoAt.length ? `${campus?.code} (and also ${alsoAt.join(", ")})` : campus?.code;
   const assignments =
     endedAssignments > 0
-      ? ` Their ${endedAssignments} student assignment${endedAssignments === 1 ? "" : "s"} ended; those students are matched again at their next meeting.`
+      ? ` ${endedAssignments} student assignment${endedAssignments === 1 ? "" : "s"} ended; those students are matched again at their next meeting.`
       : "";
-  return { ok: true, message: `Saved. ${fullName({ first_name: fields.firstName, last_name: fields.lastName })} is now ${ROLE_LABEL[newRole]} at ${campus?.code}.${assignments}` };
+  return { ok: true, message: `Saved. ${fullName({ first_name: fields.firstName, last_name: fields.lastName })} is now ${ROLE_LABEL[newRole]} at ${where}.${assignments}` };
 }
 
 /**

@@ -137,7 +137,9 @@ export async function reassignFacilitatorAction(studentId: string, facilitatorId
       .select("id, campus_id, role, is_active")
       .eq("id", facilitatorId)
       .maybeSingle<Pick<Profile, "id" | "campus_id" | "role" | "is_active">>();
-    if (!facilitator || facilitator.role !== "facilitator" || !facilitator.is_active || facilitator.campus_id !== actor.campus_id) {
+    // A facilitator can work at several campuses, so "from your campus" means one who works here, not only one set here.
+    const { data: worksHere } = await supabase.rpc("works_at", { p_user: facilitatorId, p_campus: actor.campus_id });
+    if (!facilitator || facilitator.role !== "facilitator" || !facilitator.is_active || worksHere !== true) {
       return { ok: false, error: "Pick an active facilitator from your campus." };
     }
   }

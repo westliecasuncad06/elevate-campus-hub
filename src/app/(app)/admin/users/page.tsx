@@ -43,6 +43,13 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
   const people = (data ?? []) as unknown as (Profile & { program: { code: string } | null })[];
 
   const programsByCampus = await getActiveProgramsByCampus(supabase);
+
+  // The other campuses each facilitator works at (besides the one they are set to now).
+  const { data: extraRows } = await supabase.from("profile_campuses").select("profile_id, campus_id");
+  const extraCampuses = new Map<string, string[]>();
+  for (const row of (extraRows ?? []) as { profile_id: string; campus_id: string }[]) {
+    extraCampuses.set(row.profile_id, [...(extraCampuses.get(row.profile_id) ?? []), row.campus_id]);
+  }
   const campusOptions = campuses.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` }));
 
   return (
@@ -112,7 +119,20 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                       ) : null}
                     </TableCell>
                     <TableCell>{ROLE_LABEL[p.role]}</TableCell>
-                    <TableCell>{p.campus_id ? (campusCode.get(p.campus_id) ?? "—") : "All"}</TableCell>
+                    <TableCell>
+                      {p.campus_id ? (
+                        <>
+                          {campusCode.get(p.campus_id) ?? "—"}
+                          {(extraCampuses.get(p.id) ?? []).length > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              also {(extraCampuses.get(p.id) ?? []).map((id) => campusCode.get(id) ?? "?").sort().join(", ")}
+                            </p>
+                          ) : null}
+                        </>
+                      ) : (
+                        "All"
+                      )}
+                    </TableCell>
                     <TableCell>
                       <AccountStatusBadge profile={p} />
                     </TableCell>
@@ -135,6 +155,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                             course: p.course,
                             year_level: p.year_level,
                             student_number: p.student_number,
+                            extra_campus_ids: extraCampuses.get(p.id) ?? [],
                           }}
                           campuses={campusOptions}
                           programsByCampus={programsByCampus}
