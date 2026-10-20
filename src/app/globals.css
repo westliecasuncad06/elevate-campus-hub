@@ -1,0 +1,152 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-schibsted);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-archivo);
+  --font-display: var(--font-archivo);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-success: var(--success);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+  Elevate palette (light only): black, white and the logo's red.
+    brand   #ED482D  the red in the logo (marks, accents, big shapes)
+    primary #D93A1E  the same red, deepened so white button text passes AA contrast
+    ink     #0A0A0A  text and the sidebar
+    paper   #F5F5F2  page background, with white cards on top
+    ember   #8A2211  dark red for small text on a red tint
+*/
+:root {
+  --brand: #ed482d;
+  --brand-ink: #8a2211;
+  --background: #f5f5f2;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #d93a1e;
+  --primary-foreground: #ffffff;
+  --secondary: #ebebe7;
+  --secondary-foreground: #0a0a0a;
+  --muted: #efefeb;
+  --muted-foreground: #5a5a56;
+  --accent: #fbe8e3;
+  --accent-foreground: #0a0a0a;
+  --destructive: #b3261e;
+  --border: #e1e1dc;
+  --input: #cdcdc7;
+  --ring: #ed482d;
+  --success: #1c8a4a;
+  --chart-1: #ed482d;
+  --chart-2: #0a0a0a;
+  --chart-3: #8a8a85;
+  --chart-4: #b3261e;
+  --chart-5: #5a5a56;
+  --radius: 0.75rem;
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ed482d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1f1f1f;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #ed482d;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+  }
+  html {
+    @apply font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+  Display type echoes the logo: heavy, wide, slanted. Used for the wordmark, the tagline and big numbers,
+  never for body copy.
+*/
+@utility display {
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 800;
+  font-style: italic;
+  font-stretch: 125%;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+}
+
+/* Scanner viewfinder: animated sweep line (draws attention once per scan cycle) */
+@keyframes scan-sweep {
+  0%,
+  100% {
+    transform: translateY(8%);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(92%);
+    opacity: 1;
+  }
+}

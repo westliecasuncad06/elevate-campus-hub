@@ -1,0 +1,89 @@
+<!--
+  Supabase > Authentication > Email Templates > "Reset password"
+  Subject:  Choose your Elevate Campus Hub password
+  Body:     paste everything from <!doctype html> down.
+  Used when someone already opened their invitation but never chose a password (Campus Head > Students >
+  Resend invitation), and for any other "set a new password" email. Same landing page as the invitation.
+  Colours: black #0A0A0A, white, Elevate red #ED482D.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light only" />
+    <title>Choose your Elevate Campus Hub password</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f5f5f2;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f5f5f2;">
+      Choose your password to get into your account.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f2;">
+      <tr>
+        <td align="center" style="padding:28px 14px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
+            <tr>
+              <td bgcolor="#0a0a0a" style="background-color:#0a0a0a;border-radius:14px 14px 0 0;padding:26px 30px 22px 30px;font-family:Arial,Helvetica,sans-serif;">
+                <div style="font-size:28px;line-height:30px;font-weight:900;font-style:italic;letter-spacing:2px;color:#ffffff;">
+                  ELEV<span style="color:#ed482d;">&#923;</span>TE
+                </div>
+                <div style="margin-top:6px;font-size:11px;line-height:14px;font-weight:bold;letter-spacing:4px;color:#9a9a96;">
+                  CAMPUS HUB
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td height="5" bgcolor="#ed482d" style="background-color:#ed482d;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+
+            <tr>
+              <td bgcolor="#ffffff" style="background-color:#ffffff;border-left:1px solid #e1e1dc;border-right:1px solid #e1e1dc;padding:34px 30px 30px 30px;font-family:Arial,Helvetica,sans-serif;color:#0a0a0a;">
+                <h1 style="margin:0 0 14px 0;font-size:26px;line-height:32px;font-weight:bold;color:#0a0a0a;">
+                  {{ if .Data.first_name }}Hi {{ .Data.first_name }},{{ else }}Hi,{{ end }}
+                </h1>
+                <p style="margin:0 0 12px 0;font-size:16px;line-height:25px;color:#0a0a0a;">
+                  Use the button below to choose a password for your Elevate Campus Hub account.
+                </p>
+                <p style="margin:0 0 26px 0;font-size:16px;line-height:25px;color:#0a0a0a;">
+                  It only takes a minute, and you'll use it every time you sign in.
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" bgcolor="#d93a1e" style="background-color:#d93a1e;border-radius:8px;">
+                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery"
+                         style="display:inline-block;padding:15px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">
+                        Choose my password
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:26px 0 0 0;font-size:13px;line-height:20px;color:#5a5a56;">
+                  This link works once. If it stops working, ask your Campus Head to send you a new link.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td bgcolor="#0a0a0a" align="center" style="background-color:#0a0a0a;border-radius:0 0 14px 14px;padding:16px 20px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;font-weight:bold;font-style:italic;letter-spacing:2px;color:#ffffff;">
+                CHANGE THE CAMPUS ONE STUDENT AT A TIME.
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:20px 8px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#5a5a56;">
+                Button not working? Copy this address into your browser:<br />
+                <span style="word-break:break-all;color:#d93a1e;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery</span>
+                <br /><br />
+                Didn't ask for this? You can safely ignore this email. Nothing changes unless you open the link.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

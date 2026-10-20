@@ -1,0 +1,33 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// Vercel Cron calls this every 3 days (see vercel.json) so the free Supabase project never
+// reaches 7 days without a query and gets paused.
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+  // Vercel sends "Authorization: Bearer <CRON_SECRET>" automatically when CRON_SECRET is set.
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("campuses").select("id").limit(1);
+
+  if (error) {
+    await admin.from("system_logs").insert({ event: "keep_alive", level: "error", detail: { error: error.message } });
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  // Housekeeping while we're here: notifications older than 60 days aren't useful any more.
+  const cutoff = new Date(Date.now() - 60 * 86_400_000).toISOString();
+  const { error: cleanupError } = await admin.from("notifications").delete().lt("created_at", cutoff);
+
+  await admin.from("system_logs").insert({
+    event: "keep_alive",
+    level: "info",
+    detail: { source: "cron", ...(cleanupError ? { cleanup_error: cleanupError.message } : {}) },
+  });
+  return NextResponse.json({ ok: true, at: new Date().toISOString() });
+}
