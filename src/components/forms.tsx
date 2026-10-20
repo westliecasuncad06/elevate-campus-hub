@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2Icon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,10 @@ export function SubmitButton({
   );
 }
 
-/** Labelled input with an optional hint. */
+/**
+ * Labelled input with an optional hint. A password field gets an eye button on the right to show or hide what was
+ * typed (so a typo can be spotted before signing in), on every form that has one.
+ */
 export function Field({
   label,
   name,
@@ -47,10 +50,35 @@ export function Field({
   ...props
 }: React.ComponentProps<typeof Input> & { label: string; name: string; hint?: string }) {
   const id = React.useId();
+  const [revealed, setRevealed] = React.useState(false);
+  const isPassword = props.type === "password";
+
   return (
     <div className={cn("grid gap-1.5", className)}>
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={name} {...props} />
+      {isPassword ? (
+        <div className="relative">
+          <Input
+            id={id}
+            name={name}
+            {...props}
+            type={revealed ? "text" : "password"}
+            className="pr-11"
+          />
+          <button
+            type="button"
+            onClick={() => setRevealed((shown) => !shown)}
+            aria-label={revealed ? "Hide password" : "Show password"}
+            aria-pressed={revealed}
+            title={revealed ? "Hide password" : "Show password"}
+            className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {revealed ? <EyeOffIcon className="size-5" /> : <EyeIcon className="size-5" />}
+          </button>
+        </div>
+      ) : (
+        <Input id={id} name={name} {...props} />
+      )}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
