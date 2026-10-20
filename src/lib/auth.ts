@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { signedInWithGoogle } from "@/lib/google-login";
 import { PRIVACY_VERSION } from "@/lib/privacy";
 import { ROLE_HOME } from "@/lib/roles";
 import type { Campus, Profile, Role } from "@/lib/types";
@@ -19,6 +20,13 @@ export const getSessionProfile = cache(async (): Promise<Profile | null> => {
     .maybeSingle<Profile>();
   return profile ?? null;
 });
+
+/** Whether the current session was started with "Continue with Google" (as opposed to a password or an email link). */
+export async function isGoogleSession(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  return signedInWithGoogle(data?.claims);
+}
 
 /** Requires an active, signed-in user who has already chosen their own password. */
 export async function requireProfile(): Promise<Profile> {

@@ -2,14 +2,28 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { siteUrl } from "@/lib/accounts";
+import { safeNext } from "@/lib/redirects";
 import { ROLE_HOME } from "@/lib/roles";
 import type { ActionResult, Profile } from "@/lib/types";
 
-/** Only allow same-site relative redirects. */
-function safeNext(next: FormDataEntryValue | null): string | null {
-  if (typeof next !== "string") return null;
-  if (!next.startsWith("/") || next.startsWith("//")) return null;
-  return next;
+/**
+ * "Continue with Google": sends the person to Google, which sends them back to /auth/callback. Only accounts that were
+ * invited can finish signing in (the callback checks), because public sign-ups are off in Supabase.
+ */
+export async function signInWithGoogle(formData: FormData): Promise<void> {
+  const callback = new URL("/auth/callback", await siteUrl());
+  const next = safeNext(formData.get("next"));
+  if (next) callback.searchParams.set("next", next);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    // Let people with several Google accounts pick the right one instead of silently using the last one.
+    options: { redirectTo: callback.toString(), queryParams: { prompt: "select_account" } },
+  });
+  if (error || !data.url) redirect("/login?error=google_failed");
+  redirect(data.url);
 }
 
 export async function signIn(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

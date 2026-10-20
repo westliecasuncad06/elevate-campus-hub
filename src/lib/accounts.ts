@@ -13,7 +13,7 @@ type Result<T extends object = object> = ({ ok: true } & T) | { ok: false; error
  * The public address invitation links should open: NEXT_PUBLIC_SITE_URL when it's set, otherwise the address this
  * very request came in on (so an app running on Vercel never builds links that point at localhost).
  */
-async function siteUrl(): Promise<string> {
+export async function siteUrl(): Promise<string> {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
 

@@ -52,6 +52,14 @@ Two things to set in Supabase (the code comes from Supabase's email OTP, so they
 - **Authentication → Providers → Email → Email OTP Length: 6** (a new project defaults to 8; the app accepts 6 to 10 digits), and
   pick how long a code stays valid (**Email OTP Expiration**), for example a day.
 
+### Signing in with Google
+
+The sign-in page also has **Continue with Google**, so people don't have to remember a password. It appears by itself once the
+Google provider is switched on in Supabase ([setup steps](DEPLOYMENT.md#sign-in-with-google-optional)). It does **not** open the
+app to everyone: the Google account's email must belong to someone who was already invited, otherwise the person is turned away
+with "That Google account hasn't been invited yet" and nothing is created. The first time, someone who hasn't registered yet
+still fills in their details and accepts the Data Privacy Notice, but a password is optional. Email and password keep working.
+
 ### Managing users (Super Admin)
 
 **Users** lists everyone with a login. Each row has **Edit**, **Reset password**, **Deactivate** and **Delete**.
@@ -236,6 +244,8 @@ In Supabase **Authentication**:
    If a link does expire, the Campus Head can press **Resend invitation** on the Students page.
 5. **Email delivery:** Supabase's built-in sender only allows a handful of emails per hour. Before registering
    real students, add a free SMTP provider under **Authentication → SMTP Settings** (for example Brevo or Resend).
+6. **Google sign-in (optional):** create a Google OAuth client and switch the Google provider on in Supabase. The full
+   click-by-click is in [DEPLOYMENT.md](DEPLOYMENT.md#sign-in-with-google-optional). Keep "Allow new users to sign up" **off**.
 
 ### 4. Run the app
 

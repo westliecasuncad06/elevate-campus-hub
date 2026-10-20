@@ -15,11 +15,14 @@ export function SetPasswordForm({
   role,
   needsPrivacy,
   needsDetails,
+  passwordOptional,
 }: {
   role: Role;
   needsPrivacy: boolean;
   /** Invited by email only: ask for their own name and details too. */
   needsDetails: boolean;
+  /** Signed in with Google: choosing a password is up to them. */
+  passwordOptional: boolean;
 }) {
   const { state, pending, formProps } = useFormAction(setPassword);
 
@@ -46,20 +49,31 @@ export function SetPasswordForm({
         </div>
       ) : null}
       <Field
-        label="New password"
+        label={passwordOptional ? "Password (optional)" : "New password"}
         name="password"
         type="password"
         autoComplete="new-password"
         minLength={8}
-        hint="At least 8 characters."
-        required
+        hint={
+          passwordOptional
+            ? "Leave empty to sign in with Google only. Add one (at least 8 characters) if you also want to sign in with your email."
+            : "At least 8 characters."
+        }
+        required={!passwordOptional}
         autoFocus={!needsDetails}
       />
-      <Field label="Confirm password" name="confirm" type="password" autoComplete="new-password" minLength={8} required />
+      <Field
+        label="Confirm password"
+        name="confirm"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+        required={!passwordOptional}
+      />
       {needsPrivacy ? <PrivacyConsent role={role} mode="self" /> : null}
       <FormMessage state={state} />
       <SubmitButton size="lg" pending={pending} pendingText="Saving…">
-        {needsPrivacy ? "Agree and create my account" : "Save password"}
+        {needsPrivacy ? "Agree and create my account" : passwordOptional ? "Continue" : "Save password"}
       </SubmitButton>
     </form>
   );

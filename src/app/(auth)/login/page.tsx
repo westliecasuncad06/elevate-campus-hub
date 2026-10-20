@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand, LogoMark } from "@/components/brand";
+import { isGoogleLoginEnabled } from "@/lib/google-login";
+import { GoogleButton } from "./google-button";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -9,12 +11,16 @@ const NOTICES: Record<string, string> = {
   inactive: "Your account was deactivated. Contact your Campus Head or IT.",
   no_profile: "This account no longer exists. Contact your Campus Head or IT if that's a mistake.",
   invite_expired: "That invitation link has expired or was already used. Ask your Campus Head to send a new invitation.",
+  google_not_invited:
+    "That Google account hasn't been invited yet. Ask your Campus Head to invite the email you use with Google, or sign in with your email and password.",
+  google_failed: "Google sign-in didn't finish. Try again, or sign in with your email and password.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : undefined;
   const notice = typeof params.error === "string" ? NOTICES[params.error] : undefined;
+  const googleEnabled = await isGoogleLoginEnabled();
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)]">
@@ -44,6 +50,19 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             <p role="alert" className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {notice}
             </p>
+          ) : null}
+          {googleEnabled ? (
+            <>
+              <GoogleButton next={next} />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Use the Google account that matches your invited email.
+              </p>
+              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or use your email and password
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </>
           ) : null}
           <LoginForm next={next} />
           <p className="mt-6 text-sm text-muted-foreground">

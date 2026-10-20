@@ -77,6 +77,36 @@ broken, and an email app that blocks pictures still looks right. Their links poi
 app ever moves to another address, change those links in `docs/email-templates/invite.html` and `recovery.html` (search for
 `elevate-campus-hub.vercel.app`) and paste the templates into Supabase again.
 
+### Sign in with Google (optional)
+
+This adds **Continue with Google** to the sign-in page. Only people who were already invited can get in: their Google
+account's email must be the email they were invited with (Supabase links the two by email). Keep **Allow new users to sign
+up** switched **off** (Authentication → Sign In / Providers → Email), because that is what turns away Google accounts nobody
+invited. The button shows up on its own, within about a minute, once the provider is on.
+
+**A. In Google (<https://console.cloud.google.com>, sign in with any Google account)**
+
+1. Top bar → project picker → **New project** → name `Elevate Campus Hub` → **Create**, then select it.
+2. Menu → **APIs & Services → OAuth consent screen** (newer screens call it **Google Auth Platform**) → **Get started**.
+   App name `Elevate Campus Hub`, your email as support email, Audience **External**, your email as contact → **Create**.
+3. **Audience** (or **Publishing status**) → **Publish app** → confirm. Leave it on **In production**. While it says
+   *Testing*, only people you list as test users can sign in. We only ask for name and email, so Google needs no review.
+4. **Clients** (or **Credentials → Create credentials → OAuth client ID**) → type **Web application**, name `Elevate Campus Hub`.
+   - **Authorized JavaScript origins**: `https://elevate-campus-hub.vercel.app` and `http://localhost:3000`.
+   - **Authorized redirect URIs**: `https://xkdnztgfleimmjhpbvvn.supabase.co/auth/v1/callback`
+     (this is your Supabase address plus `/auth/v1/callback`; Supabase also shows it in step B).
+   - **Create**, then copy the **Client ID** and **Client secret**.
+
+**B. In Supabase**
+
+1. **Authentication → Sign In / Providers → Google** → switch **Enable Sign in with Google** on.
+2. Paste the **Client ID** and **Client secret** → **Save**.
+3. **Authentication → URL Configuration → Redirect URLs** must contain `https://elevate-campus-hub.vercel.app/**` (and
+   `http://localhost:3000/**` for local work), as in step 3 above.
+
+**C. Check**: open the sign-in page, press **Continue with Google** and pick the invited Google account. You land in your
+area. Someone who has not registered yet is asked for their details and the privacy notice first; a password is optional.
+
 ## 4. Check it works
 
 1. Open the address: you should see the landing page. **Sign in** with a real account.
@@ -107,6 +137,10 @@ app ever moves to another address, change those links in `docs/email-templates/i
 | Invitation link opens a `vercel.com/...` page that says **404** | The Supabase **Site URL** was set to the Vercel *dashboard* address. Set it to `https://elevate-campus-hub.vercel.app` (Authentication → URL Configuration), and paste the current `invite.html` / `recovery.html` into Supabase (they carry the real address themselves). Old emails keep their old link: send a new invitation. |
 | Invitation button opens `localhost` | Three things decide the address, all must be the Vercel URL: (1) Supabase → Authentication → URL Configuration → **Site URL** (the email button is built from it), (2) `NEXT_PUBLIC_SITE_URL` in **Vercel** (if it is missing the app uses the address the request came in on), (3) send the invitation **from the deployed site**, not from `npm run dev`: a local app uses your local `.env.local`. Hover the email button to see where it points; old emails keep their old address, so send a new invitation. |
 | Invitation link says it expired / redirects to login | Add the Vercel address to Supabase **Redirect URLs**; links are single-use. |
+| No **Continue with Google** button on the sign-in page | The Google provider is not switched on in Supabase (Authentication → Sign In / Providers → Google), or its Client ID / secret is empty. Turn it on and wait about a minute. |
+| Google shows `Error 400: redirect_uri_mismatch` | The **Authorized redirect URI** in the Google client must be exactly `https://<your-supabase-ref>.supabase.co/auth/v1/callback` (the address Supabase shows under the Google provider). |
+| Google says the app is blocked / "access denied" for some people | The Google consent screen is still in **Testing**. Open it in Google Cloud and **Publish app** (or add those people as test users). |
+| "That Google account hasn't been invited yet" | The Google account's email isn't an invited email. Ask the Campus Head to invite that exact email, or sign in with the email and password they were invited with. |
 | Sign-in loops or logs you out | Check the `SUPABASE_SERVICE_ROLE_KEY` and that the Site URL is `https`. |
 | Cron shows 401 | `CRON_SECRET` is missing in Vercel. Add it (Production) and redeploy. |
 | Pages are slow | Confirm the function region is `syd1` (Project → Settings → Functions). |

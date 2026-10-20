@@ -1,9 +1,10 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCampus, getSessionProfile } from "@/lib/auth";
+import { getCampus, getSessionProfile, isGoogleSession } from "@/lib/auth";
 import { todayInTimezone } from "@/lib/dates";
 import { PRIVACY_VERSION } from "@/lib/privacy";
 import { ROLE_HOME } from "@/lib/roles";
@@ -16,8 +17,12 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
 
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
-  if (password.length < 8) return { ok: false, error: "Use at least 8 characters." };
-  if (password !== confirm) return { ok: false, error: "The two passwords don't match." };
+  // Someone who signed in with Google has already proven who they are, so for them a password is optional.
+  const choosePassword = !(await isGoogleSession()) || password !== "" || confirm !== "";
+  if (choosePassword) {
+    if (password.length < 8) return { ok: false, error: "Use at least 8 characters." };
+    if (password !== confirm) return { ok: false, error: "The two passwords don't match." };
+  }
 
   // First-time setup (or a new notice version): the person must accept the Data Privacy Notice themselves.
   const needsPrivacy = profile.privacy_accepted_version !== PRIVACY_VERSION;
@@ -52,9 +57,16 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
     }
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { ok: false, error: error.message };
+  if (choosePassword) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { ok: false, error: error.message };
+  } else if (!profile.password_changed) {
+    // Google only: replace the temporary password this account may still have (set by IT) with one nobody knows, so
+    // the person signing in with Google is the only one who can get in. They can ask IT for a new password later.
+    const { error } = await admin.auth.admin.updateUserById(profile.id, { password: randomBytes(32).toString("base64url") });
+    if (error) return { ok: false, error: "Your account could not be finished. Try again." };
+  }
 
   // Profile columns are not writable through RLS, so use the service role.
   const now = new Date().toISOString();
