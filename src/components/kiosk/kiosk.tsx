@@ -117,7 +117,7 @@ function EntryScreen({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    onBusy(pending ? "Checking you in" : null);
+    onBusy(pending ? "Counting you in" : null);
     return () => onBusy(null);
   }, [pending, onBusy]);
 
@@ -136,10 +136,11 @@ function EntryScreen({
 
   return (
     <div className="mt-2">
-      <h1 className="text-center text-5xl font-bold tracking-tight text-balance sm:text-6xl">Check in</h1>
-      <p className="mt-3 text-center text-xl text-muted-foreground">Type your number to mark your attendance.</p>
+      <h1 className="text-center text-5xl font-bold tracking-tight text-balance sm:text-6xl">Welcome!</h1>
+      <p className="mt-3 text-center text-xl text-muted-foreground">Type your {kind === "student_number" ? "student number" : "phone number"} to be counted in today.
+      </p>
 
-      <div role="tablist" aria-label="Check in with" className="mx-auto mt-10 grid max-w-lg grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1.5">
+      <div role="tablist" aria-label="Count me in with" className="mx-auto mt-10 grid max-w-lg grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1.5">
         {KINDS.map((k) => (
           <button
             key={k.id}
@@ -171,8 +172,8 @@ function EntryScreen({
             {error}
           </p>
         ) : null}
-        <SubmitButton size="lg" pending={pending} pendingText="Checking…" className="h-16 text-2xl">
-          Check in
+        <SubmitButton size="lg" pending={pending} pendingText="Counting you in…" className="h-16 text-2xl">
+          Count me in
         </SubmitButton>
       </form>
     </div>
@@ -204,7 +205,7 @@ function AskScreen({ kind, onYes, onNo }: { kind: KioskKind; onYes: () => void; 
       <h1 className="mt-6 text-5xl font-bold tracking-tight text-balance">No account yet</h1>
       <p className="mx-auto mt-3 max-w-md text-xl text-muted-foreground">
         We couldn&apos;t find that {kind === "student_number" ? "student number" : "phone number"}. Would you like to create an
-        account and check in?
+        account and be counted in today?
       </p>
       <div className="mx-auto mt-10 grid max-w-md grid-cols-2 gap-4">
         <Button variant="outline" size="lg" className="h-16 text-2xl" onClick={onNo}>
@@ -252,7 +253,7 @@ function RegisterScreen({
       <div>
         <h1 className="text-4xl font-bold tracking-tight">Create your account</h1>
         <p className="mt-1 text-base text-muted-foreground">
-          Fill in your details. You&apos;ll be checked in right after, and we&apos;ll email you a link to set your password.
+          Fill in your details. You&apos;ll be counted in right after, and we&apos;ll email you a link to set your password.
         </p>
       </div>
       <AccountFields role="student" programs={programs} defaults={defaults} lockedField={kind} consentMode="self" />
@@ -262,7 +263,7 @@ function RegisterScreen({
           Cancel
         </Button>
         <SubmitButton size="lg" pending={pending} pendingText="Creating your account…">
-          Create account and check in
+          Create account and count me in
         </SubmitButton>
       </div>
     </form>
