@@ -2,6 +2,7 @@
 
 import { Field, FormMessage, FormSelect, SubmitButton } from "@/components/forms";
 import { PrivacyConsent } from "@/components/privacy/privacy-consent";
+import { StudentNumberField } from "@/components/student-number-field";
 import { useFormAction } from "@/components/use-form-action";
 import { usesProgramList } from "@/lib/course";
 import type { Program, Role } from "@/lib/types";
@@ -79,7 +80,7 @@ export function SetPasswordForm({
               <FormSelect label="Year level" name="year_level" options={YEAR_OPTIONS} placeholder="Select" required />
               <Field label="Church (optional)" name="church" autoComplete="off" />
               <Field label="Religion (optional)" name="religion" autoComplete="off" />
-              <Field label="Student number (optional)" name="student_number" autoComplete="off" className="sm:col-span-2" />
+              <StudentNumberField className="sm:col-span-2" />
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Your gender decides which facilitator you can chat with: a facilitator and a student chat only if they are the same gender.
               </p>

@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/accounts";
 import { isBot, verifyTurnstile } from "@/lib/bot-guard";
+import { sessionIdFromToken } from "@/lib/email-code-core";
+import {
+  emailGate,
+  getSecuritySettings,
+  markSessionVerified,
+  sendLoginCode,
+  trustedSince,
+  verificationExpiry,
+} from "@/lib/email-code";
 import { checkRateLimits, clientIp, logBlock, rateKey, refundRateLimit, resetRateLimit, tooManyMessage } from "@/lib/rate-limit";
 import { safeNext } from "@/lib/redirects";
 import { ROLE_HOME } from "@/lib/roles";
@@ -86,9 +95,9 @@ export async function signIn(_prev: ActionResult | null, formData: FormData): Pr
   // Read with the server's key: a session that still owes its two-step code can't read the database yet.
   const { data: profile } = await createAdminClient()
     .from("profiles")
-    .select("role, is_active, password_changed, mfa_enabled")
+    .select("id, email, first_name, role, is_active, password_changed, mfa_enabled")
     .eq("id", data.user.id)
-    .maybeSingle<Pick<Profile, "role" | "is_active" | "password_changed" | "mfa_enabled">>();
+    .maybeSingle<Pick<Profile, "id" | "email" | "first_name" | "role" | "is_active" | "password_changed" | "mfa_enabled">>();
 
   if (!profile) {
     await supabase.auth.signOut({ scope: "local" });
@@ -100,7 +109,33 @@ export async function signIn(_prev: ActionResult | null, formData: FormData): Pr
   }
 
   const next = safeNext(formData.get("next"));
-  if (profile.mfa_enabled) redirect(next ? `/login/verify?next=${encodeURIComponent(next)}` : "/login/verify");
+  const withNext = (path: string, extra: Record<string, string> = {}) => {
+    const params = new URLSearchParams(extra);
+    if (next) params.set("next", next);
+    const query = params.toString();
+    return query ? `${path}?${query}` : path;
+  };
+
+  // An authenticator app is the stronger second step, so someone who has one uses that.
+  if (profile.mfa_enabled) redirect(withNext("/login/verify"));
+
+  // The school asks for a code by email (when the Super Admin has switched that on for this role).
+  const settings = await getSecuritySettings();
+  if (settings.enabled && settings.roles.includes(profile.role)) {
+    const sessionId = sessionIdFromToken(data.session?.access_token);
+    const gate = sessionId ? await emailGate(profile.id, sessionId) : { required: true, verified: false };
+    if (gate.required && !gate.verified) {
+      // This browser passed the check recently: a new sign-in within the hours goes straight through.
+      const since = sessionId ? await trustedSince(profile.id, settings.hours) : null;
+      if (sessionId && since) {
+        await markSessionVerified(sessionId, profile.id, verificationExpiry(since, settings.hours));
+      } else {
+        const sent = await sendLoginCode({ id: profile.id, email: profile.email, first_name: profile.first_name }, "signin");
+        redirect(withNext("/login/email-code", { sent: sent.ok ? "1" : "0" }));
+      }
+    }
+  }
+
   if (!profile.password_changed) redirect("/set-password");
 
   redirect(next ?? ROLE_HOME[profile.role]);

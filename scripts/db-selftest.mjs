@@ -374,6 +374,82 @@ check("a finished batch can't be reopened by editing the table", !r.rows?.length
   check("the restrictive policies exist on the broadcast tables", (await q("select count(*)::int n from pg_policies where policyname in ('chat_messages_mfa_required','notifications_mfa_required') and permissive = 'RESTRICTIVE'"))[0].n === 2);
   await q("delete from auth.mfa_factors where user_id = $1", [stuM]);
   await q("delete from public.notifications where recipient_id = $1 and title = 'Hello'", [stuM]);
+
+  // ----- Emailed sign-in code (migration 0019) -----
+  console.log("\nEmailed sign-in code");
+  const sess = randomUUID();
+  const withSession = (sub, session, extra = {}) => claims(sub, { session_id: session, ...extra });
+  const gate = (sub, session, extra) => guarded(sub, withSession(sub, session, extra));
+
+  const defaults = (await q("select email_code_enabled, email_code_roles, email_code_hours from public.security_settings"))[0];
+  check("it is OFF by default, for students, lasting 5 hours", defaults.email_code_enabled === false && defaults.email_code_roles.join() === "student" && defaults.email_code_hours === 5, JSON.stringify(defaults));
+  check("while it is off nobody is held back", !(await gate(stuM, sess)).error && (await q("select public.email_code_required_for($1) r", [stuM]))[0].r === false);
+
+  await q("update public.security_settings set email_code_enabled = true, email_test_ok_at = now()");
+  check("switched on: it is required of students", (await q("select public.email_code_required_for($1) r", [stuM]))[0].r === true);
+  check("...but not of facilitators or Campus Heads (not in the chosen roles)", (await q("select public.email_code_required_for($1) a, public.email_code_required_for($2) b", [facM, head1]))[0].a === false && (await q("select public.email_code_required_for($1) b", [head1]))[0].b === false);
+  const unverified = await gate(stuM, sess);
+  check("a password-only session that has not entered the code is refused (PT403)", !!unverified.error && /Two-step/.test(unverified.error), unverified.error ?? "allowed");
+  check("a facilitator is unaffected", !(await gate(facM, sess)).error);
+  check("a signed-out or service-role request still passes", !(await tryQ("select public.enforce_mfa()")).error);
+  check("email_code_gate says: required, not verified yet", (await q("select * from public.email_code_gate($1, $2)", [stuM, sess]))[0].required === true && (await q("select verified from public.email_code_gate($1, $2)", [stuM, sess]))[0].verified === false);
+
+  await q("select public.email_code_pass($1, $2, now() + interval '5 hours')", [sess, stuM]);
+  check("after the code is entered, that session is allowed", !(await gate(stuM, sess)).error);
+  check("email_code_gate says verified", (await q("select verified from public.email_code_gate($1, $2)", [stuM, sess]))[0].verified === true);
+  check("a DIFFERENT session of the same person (someone who only knows the password) is still refused", !!(await gate(stuM, randomUUID())).error);
+  check("a token with no session id is refused", !!(await guarded(stuM, claims(stuM))).error);
+  check("a token with a garbled session id is refused, not an error for everybody", !!(await guarded(stuM, withSession(stuM, "not-a-uuid"))).error);
+  check("a Google sign-in is let through (the easy login)", !(await gate(stuM, randomUUID(), { amr: [{ method: "oauth", timestamp: 1 }] })).error);
+
+  await q("update public.session_verifications set expires_at = now() - interval '1 minute' where session_id = $1", [sess]);
+  check("once the hours are over, the same open session is asked again", !!(await gate(stuM, sess)).error);
+  await q("select public.email_code_pass($1, $2, now() + interval '5 hours')", [sess, stuM]);
+  check("...and a fresh code lets it carry on", !(await gate(stuM, sess)).error);
+
+  // their notifications follow the same rule over Realtime
+  await q("select public.notify($1, 'system', 'EmailGate', 'Body', '/student')", [stuM]);
+  const mine = (await asClaims(stuM, withSession(stuM, sess), () => q("select id from public.notifications where title = 'EmailGate'"))).length;
+  const theirs = (await asClaims(stuM, withSession(stuM, randomUUID()), () => q("select id from public.notifications where title = 'EmailGate'"))).length;
+  check("their live notifications are visible to the verified session only", mine === 1 && theirs === 0, mine + "/" + theirs);
+  await q("delete from public.notifications where title = 'EmailGate'");
+
+  // an authenticator app replaces the emailed code (and is checked instead)
+  await q("insert into auth.mfa_factors (user_id, factor_type, status) values ($1, 'totp', 'verified')", [stuM]);
+  check("someone with an authenticator app is not also asked for the emailed code", (await q("select public.email_code_required_for($1) r", [stuM]))[0].r === false);
+  check("...they need the authenticator step instead (aal1 refused, aal2 allowed with no emailed code)", !!(await gate(stuM, randomUUID())).error && !(await gate(stuM, randomUUID(), { aal: "aal2" })).error);
+  await q("delete from auth.mfa_factors where user_id = $1", [stuM]);
+
+  await q("update public.security_settings set email_code_roles = array['student','facilitator']");
+  check("the roles can be widened", (await q("select public.email_code_required_for($1) r", [facM]))[0].r === true && !!(await gate(facM, randomUUID())).error);
+  await q("update public.security_settings set email_code_roles = array['student']");
+
+  await q("update public.profiles set is_active = false where id = $1", [stuM]);
+  check("a deactivated person is not 'required' (they can't sign in at all)", (await q("select public.email_code_required_for($1) r", [stuM]))[0].r === false);
+  await q("update public.profiles set is_active = true where id = $1", [stuM]);
+
+  for (const [who, label] of [[stuM, "a student"], [head1, "a Campus Head"], [admin, "the Super Admin"]]) {
+    const reads = await Promise.all(["security_settings", "login_codes", "session_verifications", "login_trust"].map((t) => asUser(who, () => tryQ("select * from public." + t))));
+    const calls = await asUser(who, () => tryQ("select public.email_code_pass($1, $2, now() + interval '9 days')", [randomUUID(), who]));
+    check(label + " can't read the settings, codes or trust tables, or mark a session as verified", reads.every((r) => !!r.error) && !!calls.error, JSON.stringify(reads.map((r) => r.error)));
+  }
+
+  await q("insert into public.login_codes (user_id, code_hash, expires_at) values ($1, 'x', now() - interval '3 days') on conflict (user_id) do update set expires_at = excluded.expires_at", [facM]);
+  await q("insert into public.session_verifications (session_id, user_id, expires_at) values ($1, $2, now() - interval '3 days')", [randomUUID(), facM]);
+  await q("insert into public.login_trust (token_hash, user_id, verified_at) values ('old', $1, now() - interval '9 days'), ('new', $1, now())", [facM]);
+  check("cleanup removes what has run out and keeps what is current", (await q("select public.email_code_cleanup() n"))[0].n >= 3 && (await q("select count(*)::int n from public.login_trust where token_hash = 'new'"))[0].n === 1);
+
+  const gone = await mkUser("emailGate", "student", c1, "female");
+  await q("insert into public.login_codes (user_id, code_hash, expires_at) values ($1, 'h', now() + interval '10 minutes')", [gone]);
+  await q("insert into public.session_verifications (session_id, user_id, expires_at) values ($1, $2, now() + interval '1 hour')", [randomUUID(), gone]);
+  await q("insert into public.login_trust (token_hash, user_id) values ('t-gone', $1)", [gone]);
+  await q("delete from public.profiles where id = $1", [gone]);
+  check("deleting a person removes their code, verifications and trusted browsers", (await q("select (select count(*) from public.login_codes where user_id = $1) + (select count(*) from public.session_verifications where user_id = $1) + (select count(*) from public.login_trust where user_id = $1) n", [gone]))[0].n == 0);
+  await q("update public.security_settings set email_code_enabled = false, email_test_ok_at = null");
+  await q("delete from public.session_verifications");
+  await q("delete from public.login_trust");
+  await q("delete from public.login_codes");
+  check("switched off again, nobody is held back", !(await gate(stuM, randomUUID())).error);
 }
 
 const totals = (await asUser(head1, () => q("select * from public.compute_daily_report($1, $2::date)", [c1, todayManila])))[0];

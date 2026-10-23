@@ -12,11 +12,12 @@ import {
   type AttendanceOutcome,
   type StudentHit,
 } from "@/app/actions/attendance";
+import { formatStudentNumberInput } from "@/lib/student-number";
 import type { EntryMethod } from "@/lib/types";
 
 const STATUS_TEXT = { not_in: "Not in yet", checked_in: "Checked in today", in_this_batch: "Already in this batch" } as const;
 
-/** No QR or no phone? Find the student by phone number or email and add them from the list. */
+/** Find the student by student number (the usual way), phone number, email or name, and add them from the list. */
 export function LookupPanel({
   batchId,
   onOutcome,
@@ -54,15 +55,18 @@ export function LookupPanel({
   return (
     <div className="mx-auto w-full max-w-md">
       <form onSubmit={search} className="grid gap-2">
-        <Label htmlFor="lookup-query">Phone number or email</Label>
+        <Label htmlFor="lookup-query">Student number, phone number or email</Label>
         <div className="flex gap-2">
           <Input
             id="lookup-query"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="09XX XXX XXXX or name@email.com"
+            // Something that starts like a student number (2017-…) gets its dashes as it is typed.
+            onChange={(e) => {
+              const v = e.target.value;
+              setQuery(/^(19|20)[\d-]*$/.test(v.replace(/\s/g, "")) ? formatStudentNumberInput(v) : v);
+            }}
+            placeholder="2017-05-07107"
             autoComplete="off"
-            inputMode="email"
             autoFocus
           />
           <Button type="submit" disabled={searching || query.trim().length < 3}>
@@ -70,7 +74,7 @@ export function LookupPanel({
             {searching ? "Searching…" : "Find"}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">You can also type part of their name.</p>
+        <p className="text-xs text-muted-foreground">Or type their phone number, email, or part of their name.</p>
       </form>
 
       {hits ? (
@@ -86,7 +90,7 @@ export function LookupPanel({
                   <p className="truncate font-semibold">{hit.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {hit.program ? `${hit.program} · ` : ""}
-                    {hit.phone ?? hit.email}
+                    {hit.studentNumber ?? hit.phone ?? hit.email}
                   </p>
                   <p className="mt-1 text-xs font-medium text-primary">{STATUS_TEXT[hit.status]}</p>
                 </div>

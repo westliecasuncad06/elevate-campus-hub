@@ -1,0 +1,246 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { CheckCircle2Icon, MaximizeIcon, MinimizeIcon, UserPlusIcon } from "lucide-react";
+import { AccountFields } from "@/components/accounts/account-fields";
+import { Field, FormMessage, SubmitButton } from "@/components/forms";
+import { StudentNumberField } from "@/components/student-number-field";
+import { Button } from "@/components/ui/button";
+import { useFormAction } from "@/components/use-form-action";
+import { kioskCheckInAction, kioskRegisterAction, type KioskKind, type KioskOutcome } from "@/app/actions/kiosk";
+import { cn } from "@/lib/utils";
+import type { Program } from "@/lib/types";
+
+/** How long the welcome stays up before the kiosk is ready for the next student. */
+const WELCOME_SECONDS = 4;
+
+type Screen =
+  | { step: "entry" }
+  | { step: "welcome"; name: string }
+  | { step: "ask"; kind: KioskKind; value: string }
+  | { step: "register"; kind: KioskKind; value: string };
+
+const KINDS: { id: KioskKind; label: string }[] = [
+  { id: "student_number", label: "Student number" },
+  { id: "phone", label: "Phone number" },
+];
+
+/**
+ * The check-in kiosk: a laptop at the entrance where students type their student number (or phone number) to mark their
+ * attendance. Known student: "Welcome" and their name. Unknown number: offer to create an account (yes or no), with the
+ * number they typed already filled in. The Full screen button hides the rest of the app so students only see this.
+ */
+export function Kiosk({ programs, campusName }: { programs: Program[]; campusName: string }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [screen, setScreen] = useState<Screen>({ step: "entry" });
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === frame.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await frame.current?.requestFullscreen();
+    } catch {
+      // The browser refused (some embedded browsers do): the kiosk still works in the page.
+    }
+  }
+
+  const reset = useCallback(() => setScreen({ step: "entry" }), []);
+
+  return (
+    <div
+      ref={frame}
+      className={cn(
+        "relative overflow-y-auto rounded-3xl border bg-background",
+        fullscreen ? "flex min-h-screen flex-col justify-center rounded-none border-0 px-4 py-10" : "min-h-[32rem] px-4 py-10 sm:px-8",
+      )}
+    >
+      <Button
+        type="button"
+        variant="outline"
+        onClick={toggleFullscreen}
+        className="absolute top-4 right-4"
+        aria-pressed={fullscreen}
+      >
+        {fullscreen ? <MinimizeIcon /> : <MaximizeIcon />}
+        {fullscreen ? "Exit full screen" : "Full screen"}
+      </Button>
+
+      <div className="mx-auto w-full max-w-xl pt-8">
+        <p className="text-center text-sm font-medium text-muted-foreground">{campusName}</p>
+        {screen.step === "entry" ? (
+          <EntryScreen onWelcome={(name) => setScreen({ step: "welcome", name })} onUnknown={(kind, value) => setScreen({ step: "ask", kind, value })} />
+        ) : screen.step === "welcome" ? (
+          <WelcomeScreen name={screen.name} onDone={reset} />
+        ) : screen.step === "ask" ? (
+          <AskScreen kind={screen.kind} onYes={() => setScreen({ step: "register", kind: screen.kind, value: screen.value })} onNo={reset} />
+        ) : (
+          <RegisterScreen
+            kind={screen.kind}
+            value={screen.value}
+            programs={programs}
+            onWelcome={(name) => setScreen({ step: "welcome", name })}
+            onCancel={reset}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EntryScreen({
+  onWelcome,
+  onUnknown,
+}: {
+  onWelcome: (name: string) => void;
+  onUnknown: (kind: KioskKind, value: string) => void;
+}) {
+  const [kind, setKind] = useState<KioskKind>("student_number");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const raw = String(new FormData(event.currentTarget).get(kind === "student_number" ? "student_number" : "phone") ?? "");
+    setError(null);
+    startTransition(async () => {
+      const result = await kioskCheckInAction(kind, raw);
+      if (!result.ok) return setError(result.error);
+      const outcome = result.data as KioskOutcome;
+      if (outcome.status === "welcome") onWelcome(outcome.name);
+      else onUnknown(outcome.kind, outcome.value);
+    });
+  }
+
+  return (
+    <div className="mt-2">
+      <h1 className="text-center text-3xl font-bold tracking-tight text-balance sm:text-4xl">Check in</h1>
+      <p className="mt-2 text-center text-muted-foreground">Type your number to mark your attendance.</p>
+
+      <div role="tablist" aria-label="Check in with" className="mx-auto mt-8 grid max-w-sm grid-cols-2 gap-1 rounded-2xl bg-muted p-1">
+        {KINDS.map((k) => (
+          <button
+            key={k.id}
+            type="button"
+            role="tab"
+            aria-selected={kind === k.id}
+            onClick={() => {
+              setKind(k.id);
+              setError(null);
+            }}
+            className={cn(
+              "rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
+              kind === k.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {k.label}
+          </button>
+        ))}
+      </div>
+
+      <form key={kind} onSubmit={submit} className="mx-auto mt-6 grid max-w-sm gap-4">
+        {kind === "student_number" ? (
+          <StudentNumberField label="Your student number" autoFocus />
+        ) : (
+          <Field label="Your phone number" name="phone" type="tel" inputMode="tel" placeholder="09XX XXX XXXX" autoComplete="off" autoFocus required />
+        )}
+        {error ? (
+          <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <SubmitButton size="lg" pending={pending} pendingText="Checking…" className="h-14 text-lg">
+          Check in
+        </SubmitButton>
+      </form>
+    </div>
+  );
+}
+
+function WelcomeScreen({ name, onDone }: { name: string; onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, WELCOME_SECONDS * 1000);
+    return () => clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <div role="status" aria-live="polite" className="mt-6 text-center">
+      <CheckCircle2Icon className="mx-auto size-20 text-success" aria-hidden="true" />
+      <p className="mt-6 text-2xl font-medium text-muted-foreground">Welcome</p>
+      <p className="mt-2 text-5xl leading-tight font-bold tracking-tight text-balance sm:text-6xl">{name}</p>
+      <Button variant="outline" size="lg" className="mt-10" onClick={onDone}>
+        Next student
+      </Button>
+    </div>
+  );
+}
+
+function AskScreen({ kind, onYes, onNo }: { kind: KioskKind; onYes: () => void; onNo: () => void }) {
+  return (
+    <div role="alert" className="mt-6 text-center">
+      <UserPlusIcon className="mx-auto size-16 text-primary" aria-hidden="true" />
+      <h1 className="mt-6 text-3xl font-bold tracking-tight text-balance">No account yet</h1>
+      <p className="mx-auto mt-2 max-w-sm text-muted-foreground">
+        We couldn&apos;t find that {kind === "student_number" ? "student number" : "phone number"}. Would you like to create an
+        account and check in?
+      </p>
+      <div className="mx-auto mt-8 grid max-w-sm grid-cols-2 gap-3">
+        <Button variant="outline" size="lg" className="h-14 text-lg" onClick={onNo}>
+          No
+        </Button>
+        <Button size="lg" className="h-14 text-lg" onClick={onYes} autoFocus>
+          Yes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RegisterScreen({
+  kind,
+  value,
+  programs,
+  onWelcome,
+  onCancel,
+}: {
+  kind: KioskKind;
+  value: string;
+  programs: Program[];
+  onWelcome: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const { state, pending, formProps } = useFormAction<KioskOutcome>(kioskRegisterAction.bind(null, kind, value));
+
+  useEffect(() => {
+    if (state?.ok && state.data?.status === "welcome") onWelcome(state.data.name);
+  }, [state, onWelcome]);
+
+  // The number they already typed is filled in and locked; the other one is still theirs to type.
+  const defaults = kind === "student_number" ? { student_number: value } : { phone: value };
+
+  return (
+    <form {...formProps} className="mt-4 grid gap-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
+        <p className="text-sm text-muted-foreground">
+          Fill in your details. You&apos;ll be checked in right after, and we&apos;ll email you a link to set your password.
+        </p>
+      </div>
+      <AccountFields role="student" programs={programs} defaults={defaults} lockedField={kind} consentMode="self" />
+      <FormMessage state={state?.ok ? null : state} />
+      <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
+        <Button type="button" variant="outline" size="lg" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+        <SubmitButton size="lg" pending={pending} pendingText="Creating your account…">
+          Create account and check in
+        </SubmitButton>
+      </div>
+    </form>
+  );
+}

@@ -1,6 +1,6 @@
 export type Role = "super_admin" | "campus_head" | "facilitator" | "student";
 export type Gender = "male" | "female";
-export type EntryMethod = "qr" | "phone" | "email" | "manual";
+export type EntryMethod = "qr" | "phone" | "email" | "manual" | "student_number";
 
 export interface Campus {
   id: string;

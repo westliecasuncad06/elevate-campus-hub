@@ -10,6 +10,7 @@ import { looksLikeEmail, normalizePhone } from "@/lib/phone";
 import { searchTerm } from "@/lib/postgrest";
 import { getActivePrograms } from "@/lib/queries";
 import { checkRateLimits, rateKey, tooManyMessage } from "@/lib/rate-limit";
+import { parseStudentNumber } from "@/lib/student-number";
 import { parseAccountForm } from "@/lib/validation";
 import type { ActionResult, EntryMethod, Profile } from "@/lib/types";
 
@@ -32,6 +33,7 @@ export interface StudentHit {
   name: string;
   phone: string | null;
   email: string;
+  studentNumber: string | null;
   program: string | null;
   status: "not_in" | "checked_in" | "in_this_batch";
 }
@@ -125,7 +127,7 @@ export async function lookupStudentsAction(
   if (!actor) return FORBIDDEN;
 
   const query = rawQuery.trim().slice(0, 100);
-  if (query.length < 3) return { ok: false, error: "Type a phone number or email address." };
+  if (query.length < 3) return { ok: false, error: "Type a student number, phone number or email address." };
   // Someone scripting guesses at student emails and phone numbers would show up here as a flood of lookups.
   const rate = await checkRateLimits([{ key: rateKey("lookup:user", actor.id), limit: 150, windowSeconds: 300 }]);
   if (!rate.ok) return { ok: false, error: tooManyMessage(rate.retryAfter) };
@@ -133,14 +135,19 @@ export async function lookupStudentsAction(
   const supabase = await createClient();
   let builder = supabase
     .from("profiles")
-    .select("id, first_name, last_name, phone, email, course, program:programs(code)")
+    .select("id, first_name, last_name, phone, email, student_number, course, program:programs(code)")
     .eq("role", "student")
     .eq("is_active", true)
     .eq("details_complete", true)
     .limit(5);
 
   let method: EntryMethod = "manual";
-  if (looksLikeEmail(query)) {
+  // Student numbers start with the year (19xx / 20xx); phone numbers start with 09 or +63, so the two never get mixed up.
+  const studentNumber = /^(19|20)/.test(query.replace(/\D/g, "")) ? parseStudentNumber(query) : null;
+  if (studentNumber) {
+    method = "student_number";
+    builder = builder.eq("student_number", studentNumber);
+  } else if (looksLikeEmail(query)) {
     method = "email";
     // ilike without wildcards = case-insensitive exact match; escape the characters that act as wildcards.
     builder = builder.ilike("email", query.replace(/[\\%_]/g, (c) => `\\${c}`));
@@ -162,6 +169,7 @@ export async function lookupStudentsAction(
     last_name: string;
     phone: string | null;
     email: string;
+    student_number: string | null;
     course: string | null;
     program: { code: string } | null;
   }>;
@@ -189,6 +197,7 @@ export async function lookupStudentsAction(
     name: `${r.first_name} ${r.last_name}`,
     phone: r.phone,
     email: r.email,
+    studentNumber: r.student_number,
     program: courseLabel(r),
     status: inThisBatch.has(r.id) ? "in_this_batch" : checkedInToday.has(r.id) ? "checked_in" : "not_in",
   }));

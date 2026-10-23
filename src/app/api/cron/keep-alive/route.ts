@@ -25,6 +25,8 @@ export async function GET(request: NextRequest) {
   const { error: cleanupError } = await admin.from("notifications").delete().lt("created_at", cutoff);
   // Old sign-in attempt counters (rate limits) are of no use once their window has passed.
   const { data: limitsRemoved, error: limitsError } = await admin.rpc("rate_limits_cleanup");
+  // Expired sign-in codes, "this session passed" records and trusted browsers likewise.
+  const { data: codesRemoved } = await admin.rpc("email_code_cleanup");
 
   await admin.from("system_logs").insert({
     event: "keep_alive",
@@ -32,6 +34,7 @@ export async function GET(request: NextRequest) {
     detail: {
       source: "cron",
       rate_limit_rows_removed: typeof limitsRemoved === "number" ? limitsRemoved : null,
+      sign_in_code_rows_removed: typeof codesRemoved === "number" ? codesRemoved : null,
       ...(cleanupError ? { cleanup_error: cleanupError.message } : {}),
       ...(limitsError ? { rate_limit_cleanup_error: limitsError.message } : {}),
     },

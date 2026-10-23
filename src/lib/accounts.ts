@@ -74,6 +74,21 @@ export async function createAccount(params: {
     }
   }
 
+  if (fields.studentNumber && campusId) {
+    const { data: numberTaken } = await admin
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("campus_id", campusId)
+      .eq("student_number", fields.studentNumber)
+      .maybeSingle<{ first_name: string; last_name: string }>();
+    if (numberTaken) {
+      return {
+        ok: false,
+        error: `That student number already belongs to ${numberTaken.first_name} ${numberTaken.last_name}.`,
+      };
+    }
+  }
+
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(fields.email, {
     redirectTo: `${await siteUrl()}/auth/confirm`,
     data: { first_name: fields.firstName, last_name: fields.lastName },
@@ -118,7 +133,7 @@ export async function createAccount(params: {
   if (profileError) {
     await admin.auth.admin.deleteUser(userId);
     if (profileError.code === "23505") {
-      return { ok: false, error: "That email or phone number is already registered." };
+      return { ok: false, error: "That email, phone number or student number is already registered." };
     }
     return { ok: false, error: profileError.message };
   }

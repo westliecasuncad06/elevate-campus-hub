@@ -36,6 +36,32 @@ export default async function LivePage() {
       .order("first_name"),
   ]);
 
+  // Students who checked in today (kiosk, QR, ...) but haven't been added to any facilitator's batch yet.
+  const { data: todayLogs } = await supabase
+    .from("attendance_logs")
+    .select("id, student_id, time_in")
+    .eq("campus_id", profile.campus_id)
+    .eq("log_date", today)
+    .order("time_in");
+  const logIds = (todayLogs ?? []).map((l) => l.id as string);
+  const { data: batched } = logIds.length
+    ? await supabase.from("batch_students").select("attendance_log_id").in("attendance_log_id", logIds)
+    : { data: [] };
+  const inBatch = new Set((batched ?? []).map((b) => b.attendance_log_id as string));
+  const attendedOnly = (todayLogs ?? []).filter((l) => !inBatch.has(l.id as string));
+  const { data: attendedProfiles } = attendedOnly.length
+    ? await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in(
+          "id",
+          attendedOnly.map((l) => l.student_id as string),
+        )
+    : { data: [] };
+  const nameOf = new Map(
+    (attendedProfiles ?? []).map((p) => [p.id as string, `${p.first_name} ${p.last_name}`.trim()] as const),
+  );
+
   const nowIso = currentTimeIso();
   const staff = (people ?? []) as Pick<Profile, "id" | "first_name" | "last_name" | "role">[];
 
@@ -58,12 +84,34 @@ export default async function LivePage() {
         actions={<AutoRefresh seconds={10} />}
       />
 
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Facilitating now" value={activeStaff.length} />
         <StatCard label="Open batches" value={open.length} />
         <StatCard label="Students being engaged" value={studentsNow} />
         <StatCard label="Still to record" value={waiting} hint="Students waiting for engagement" />
+        <StatCard label="Attended only" value={attendedOnly.length} hint="Checked in, not with a facilitator yet" />
       </div>
+
+      <section aria-labelledby="attended-only-heading" className="mb-10">
+        <h2 id="attended-only-heading" className="mb-3 text-lg font-semibold">
+          Attended, not engaged yet
+        </h2>
+        {attendedOnly.length === 0 ? (
+          <EmptyState
+            title="Everyone who checked in today is with a facilitator"
+            hint="Students who check in at the kiosk but aren't added to a batch show up here."
+          />
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {attendedOnly.map((l) => (
+              <li key={l.id as string} className="flex items-center justify-between gap-2 rounded-xl border bg-card px-4 py-3 text-sm">
+                <span className="font-medium">{nameOf.get(l.student_id as string) ?? "Student"}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">in at {formatTime(l.time_in as string, timezone)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section aria-labelledby="active-heading" className="mb-10">
         <h2 id="active-heading" className="mb-3 text-lg font-semibold">

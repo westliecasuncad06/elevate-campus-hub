@@ -1,5 +1,6 @@
 import { formatName } from "@/lib/names";
 import { looksLikeEmail, normalizePhone } from "@/lib/phone";
+import { parseStudentNumber } from "@/lib/student-number";
 import type { Gender, Role } from "@/lib/types";
 
 export interface AccountFields {
@@ -78,7 +79,11 @@ export function parseAccountForm(role: Role, formData: FormData, today: string, 
   let programId: string | null = null;
   let course: string | null = null;
   let yearLevel: number | null = null;
+  let studentNumber: string | null = null;
   if (role === "student") {
+    // The student number is how students check in at the kiosk, so it is required and always stored dashed (2017-05-07107).
+    studentNumber = parseStudentNumber(text(formData, "student_number"));
+    if (!studentNumber) return { ok: false, error: "Enter the full student number, like 2017-05-07107." };
     if (!birthday) return { ok: false, error: "Birthday is required for students." };
     if (courseMode === "program") {
       programId = optional(formData, "program_id");
@@ -107,7 +112,7 @@ export function parseAccountForm(role: Role, formData: FormData, today: string, 
       programId,
       course,
       yearLevel,
-      studentNumber: role === "student" ? optional(formData, "student_number") : null,
+      studentNumber,
     },
   };
 }

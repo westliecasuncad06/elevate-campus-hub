@@ -13,8 +13,8 @@ import { QrScanPanel } from "./qr-scan-panel";
 type Mode = "scan" | "lookup" | "first";
 
 const MODES: { id: Mode; label: string; icon: typeof ScanLineIcon }[] = [
-  { id: "scan", label: "Scan QR", icon: ScanLineIcon },
   { id: "lookup", label: "Look up", icon: SearchIcon },
+  { id: "scan", label: "Scan QR", icon: ScanLineIcon },
   { id: "first", label: "First timer", icon: UserPlusIcon },
 ];
 
@@ -24,9 +24,9 @@ const NEXT_LABEL: Record<Mode, string> = {
   first: "Register another student",
 };
 
-/** Adds students to one batch: scan a QR, look someone up by phone or email, or register a first timer. */
+/** Adds students to one batch: look someone up by student number (or phone, email), scan a QR, or register a first timer. */
 export function AttendanceStation({ batchId, programs }: { batchId: string; programs: Program[] }) {
-  const [mode, setMode] = useState<Mode>("scan");
+  const [mode, setMode] = useState<Mode>("lookup");
   const [outcome, setOutcome] = useState<AttendanceOutcome | null>(null);
   // Bumping the key remounts a panel (restarts the camera / clears the form).
   const [panelKey, setPanelKey] = useState(0);

@@ -16,6 +16,7 @@ const student = {
   birthday: "2006-05-01",
   program_id: "11111111-1111-1111-1111-111111111111",
   year_level: "2",
+  student_number: "2017-05-07107",
   privacy_consent: "on",
 };
 
@@ -35,6 +36,13 @@ describe("parseAccountForm (student)", () => {
     expect(parseAccountForm("student", form({ ...student, gender: "" }), "2026-03-11").ok).toBe(false);
     expect(parseAccountForm("student", form({ ...student, program_id: "" }), "2026-03-11").ok).toBe(false);
     expect(parseAccountForm("student", form({ ...student, year_level: "" }), "2026-03-11").ok).toBe(false);
+  });
+
+  it("requires a full student number and stores it dashed", () => {
+    expect(parseAccountForm("student", form({ ...student, student_number: "" }), "2026-03-11").ok).toBe(false);
+    expect(parseAccountForm("student", form({ ...student, student_number: "2017-05-0710" }), "2026-03-11").ok).toBe(false);
+    const result = parseAccountForm("student", form({ ...student, student_number: "20170507107" }), "2026-03-11");
+    expect(result.ok && result.value.studentNumber).toBe("2017-05-07107");
   });
 
   it("rejects a birthday in the future", () => {

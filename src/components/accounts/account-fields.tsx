@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Field, FormSelect, type Option } from "@/components/forms";
 import { PrivacyConsent } from "@/components/privacy/privacy-consent";
+import { StudentNumberField } from "@/components/student-number-field";
 import { usesProgramList } from "@/lib/course";
 import type { Program, Role } from "@/lib/types";
 
@@ -46,6 +47,8 @@ export function AccountFields({
   campuses,
   defaults,
   mode = "create",
+  lockedField,
+  consentMode = "register",
 }: {
   role: Role;
   /** The programs of the person's campus, when the campus is fixed (Campus Head, facilitator). */
@@ -57,6 +60,10 @@ export function AccountFields({
   defaults?: AccountDefaults;
   /** "edit" pre-fills, and drops the consent box (consent was recorded when the person was registered). */
   mode?: "create" | "edit";
+  /** Already given at the kiosk, so shown but not editable: the student number or the phone number. */
+  lockedField?: "student_number" | "phone";
+  /** "register": someone else confirms the notice was read. "self": the person registering confirms it themselves (kiosk). */
+  consentMode?: "register" | "self";
 }) {
   const isStudent = role === "student";
   const needsGender = role === "student" || role === "facilitator";
@@ -116,6 +123,7 @@ export function AccountFields({
         type="tel"
         inputMode="tel"
         defaultValue={defaults?.phone ?? ""}
+        readOnly={lockedField === "phone"}
         autoComplete="off"
         placeholder="09XX XXX XXXX"
         required={isStudent}
@@ -161,16 +169,14 @@ export function AccountFields({
           />
           <Field label="Church (optional)" name="church" defaultValue={defaults?.church ?? ""} autoComplete="off" />
           <Field label="Religion (optional)" name="religion" defaultValue={defaults?.religion ?? ""} autoComplete="off" />
-          <Field
-            label="Student number (optional)"
-            name="student_number"
-            defaultValue={defaults?.student_number ?? ""}
-            autoComplete="off"
+          <StudentNumberField
+            defaultValue={defaults?.student_number}
+            readOnly={lockedField === "student_number"}
             className="sm:col-span-2"
           />
         </>
       ) : null}
-      {mode === "create" ? <PrivacyConsent role={role} mode="register" className="sm:col-span-2" /> : null}
+      {mode === "create" ? <PrivacyConsent role={role} mode={consentMode} className="sm:col-span-2" /> : null}
     </div>
   );
 }

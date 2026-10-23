@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ShieldCheckIcon } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
-import { loadSessionProfile, mfaPending } from "@/lib/auth";
+import { loadSessionProfile, secondStep } from "@/lib/auth";
 import { safeNext } from "@/lib/redirects";
 import { ROLE_HOME } from "@/lib/roles";
 import { VerifyForm } from "./verify-form";
@@ -14,8 +14,11 @@ export const metadata: Metadata = { title: "Two-step verification" };
 export default async function VerifyPage({ searchParams }: PageProps<"/login/verify">) {
   const profile = await loadSessionProfile();
   if (!profile) redirect("/login");
+  const step = await secondStep(profile);
+  // The school asks for a code by email instead of an authenticator app.
+  if (step === "email") redirect("/login/email-code");
   // Nothing to verify (two-step is off, or this session already passed it, or it came from Google): carry on.
-  if (!(await mfaPending(profile))) redirect(ROLE_HOME[profile.role]);
+  if (step === null) redirect(ROLE_HOME[profile.role]);
 
   const params = await searchParams;
   const next = typeof params.next === "string" ? (safeNext(params.next) ?? undefined) : undefined;
