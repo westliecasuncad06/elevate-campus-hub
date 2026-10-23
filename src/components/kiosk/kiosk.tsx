@@ -7,6 +7,7 @@ import { Field, FormMessage, SubmitButton } from "@/components/forms";
 import { StudentNumberField } from "@/components/student-number-field";
 import { Button } from "@/components/ui/button";
 import { useFormAction } from "@/components/use-form-action";
+import { KioskLoader } from "./kiosk-loader";
 import { kioskCheckInAction, kioskRegisterAction, type KioskKind, type KioskOutcome } from "@/app/actions/kiosk";
 import { cn } from "@/lib/utils";
 import type { Program } from "@/lib/types";
@@ -51,6 +52,8 @@ export function Kiosk({ programs, campusName }: { programs: Program[]; campusNam
   }
 
   const reset = useCallback(() => setScreen({ step: "entry" }), []);
+  // While a check-in or a new account is being saved, the loader covers the kiosk (the form underneath keeps what was typed).
+  const [busy, setBusy] = useState<string | null>(null);
 
   return (
     <div
@@ -71,10 +74,16 @@ export function Kiosk({ programs, campusName }: { programs: Program[]; campusNam
         {fullscreen ? "Exit full screen" : "Full screen"}
       </Button>
 
+      {busy ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/90 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <KioskLoader label={busy} />
+        </div>
+      ) : null}
+
       <div className="mx-auto w-full max-w-2xl pt-8">
         <p className="text-center text-lg font-medium text-muted-foreground">{campusName}</p>
         {screen.step === "entry" ? (
-          <EntryScreen onWelcome={(name) => setScreen({ step: "welcome", name })} onUnknown={(kind, value) => setScreen({ step: "ask", kind, value })} />
+          <EntryScreen onBusy={setBusy} onWelcome={(name) => setScreen({ step: "welcome", name })} onUnknown={(kind, value) => setScreen({ step: "ask", kind, value })} />
         ) : screen.step === "welcome" ? (
           <WelcomeScreen name={screen.name} onDone={reset} />
         ) : screen.step === "ask" ? (
@@ -84,6 +93,7 @@ export function Kiosk({ programs, campusName }: { programs: Program[]; campusNam
             kind={screen.kind}
             value={screen.value}
             programs={programs}
+            onBusy={setBusy}
             onWelcome={(name) => setScreen({ step: "welcome", name })}
             onCancel={reset}
           />
@@ -94,15 +104,22 @@ export function Kiosk({ programs, campusName }: { programs: Program[]; campusNam
 }
 
 function EntryScreen({
+  onBusy,
   onWelcome,
   onUnknown,
 }: {
+  onBusy: (label: string | null) => void;
   onWelcome: (name: string) => void;
   onUnknown: (kind: KioskKind, value: string) => void;
 }) {
   const [kind, setKind] = useState<KioskKind>("student_number");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    onBusy(pending ? "Checking you in" : null);
+    return () => onBusy(null);
+  }, [pending, onBusy]);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -205,16 +222,23 @@ function RegisterScreen({
   kind,
   value,
   programs,
+  onBusy,
   onWelcome,
   onCancel,
 }: {
   kind: KioskKind;
   value: string;
   programs: Program[];
+  onBusy: (label: string | null) => void;
   onWelcome: (name: string) => void;
   onCancel: () => void;
 }) {
   const { state, pending, formProps } = useFormAction<KioskOutcome>(kioskRegisterAction.bind(null, kind, value));
+
+  useEffect(() => {
+    onBusy(pending ? "Creating your account" : null);
+    return () => onBusy(null);
+  }, [pending, onBusy]);
 
   useEffect(() => {
     if (state?.ok && state.data?.status === "welcome") onWelcome(state.data.name);
