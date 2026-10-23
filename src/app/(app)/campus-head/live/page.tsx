@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CheckIcon } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { LiveHistory } from "@/components/batch/live-history";
 import { EmptyState, PageHeader, StatCard } from "@/components/page-header";
 import { getCampus, requireRole } from "@/lib/auth";
 import { formatDuration, loadBatches, pendingCount } from "@/lib/batches";
@@ -14,6 +15,12 @@ function Chip({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{children}</span>;
 }
 
+function daysAgo(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
 function currentTimeIso(): string {
   return new Date().toISOString();
 }
@@ -25,9 +32,10 @@ export default async function LivePage() {
   const today = todayInTimezone(timezone);
 
   const supabase = await createClient();
-  const [open, finishedToday, { data: people }] = await Promise.all([
+  const [open, history, { data: people }] = await Promise.all([
     loadBatches(supabase, { status: "open", limit: 100 }),
-    loadBatches(supabase, { status: "finished", from: today, to: today, limit: 100 }),
+    // Finished batches of the last 30 days: once they are done they move into the History section below.
+    loadBatches(supabase, { status: "finished", from: daysAgo(today, 30), to: today, limit: 300 }),
     supabase
       .from("profiles")
       .select("id, first_name, last_name, role")
@@ -62,6 +70,7 @@ export default async function LivePage() {
     (attendedProfiles ?? []).map((p) => [p.id as string, `${p.first_name} ${p.last_name}`.trim()] as const),
   );
 
+  const finishedToday = history.filter((b) => b.date === today);
   const nowIso = currentTimeIso();
   const staff = (people ?? []) as Pick<Profile, "id" | "first_name" | "last_name" | "role">[];
 
@@ -207,6 +216,16 @@ export default async function LivePage() {
           </ul>
         </section>
       ) : null}
+
+      <section aria-labelledby="history-heading" className="mt-10">
+        <h2 id="history-heading" className="mb-1 text-lg font-semibold">
+          History
+        </h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Finished batches by day (the last 30 days): who was engaged and how each conversation went.
+        </p>
+        <LiveHistory batches={history} timezone={timezone} today={today} />
+      </section>
     </>
   );
 }

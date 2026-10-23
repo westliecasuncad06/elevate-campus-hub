@@ -24,10 +24,13 @@ export function HistoryList({
   batches,
   timezone,
   showFacilitator,
+  hideDates,
 }: {
   batches: Batch[];
   timezone: string;
   showFacilitator: boolean;
+  /** Leave out the day headings (when the day is already the title, as in the Live page's pop-up). */
+  hideDates?: boolean;
 }) {
   if (batches.length === 0) {
     return (
@@ -45,7 +48,7 @@ export function HistoryList({
     <div className="grid gap-8">
       {[...byDate.entries()].map(([date, list]) => (
         <section key={date} aria-label={formatDate(date)}>
-          <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{formatDate(date)}</h2>
+          {hideDates ? null : <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{formatDate(date)}</h2>}
           <ul className="grid gap-3">
             {list.map((batch) => {
               const t = totals(batch);
