@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useFullscreenElement } from "@/lib/use-fullscreen-element"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "cn"
 
@@ -16,7 +17,8 @@ function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
 }
 
 function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+  const fullscreen = useFullscreenElement()
+  return <DialogPrimitive.Portal data-slot="dialog-portal" container={fullscreen ?? undefined} {...props} />
 }
 
 function DialogClose({ ...props }: DialogPrimitive.Close.Props) {

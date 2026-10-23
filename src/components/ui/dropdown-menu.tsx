@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useFullscreenElement } from "@/lib/use-fullscreen-element"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { cn } from "cn"
 import { ChevronRightIcon, CheckIcon } from "lucide-react"
@@ -10,7 +11,8 @@ function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
-  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
+  const fullscreen = useFullscreenElement()
+  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" container={fullscreen ?? undefined} {...props} />
 }
 
 function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
@@ -29,8 +31,9 @@ function DropdownMenuContent({
     MenuPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
   >) {
+  const fullscreen = useFullscreenElement()
   return (
-    <MenuPrimitive.Portal>
+    <MenuPrimitive.Portal container={fullscreen ?? undefined}>
       <MenuPrimitive.Positioner
         className="isolate z-50 outline-none"
         align={align}

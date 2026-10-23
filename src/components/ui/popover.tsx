@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useFullscreenElement } from "@/lib/use-fullscreen-element"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 import { cn } from "cn"
 
@@ -24,8 +25,9 @@ function PopoverContent({
     PopoverPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
   >) {
+  const fullscreen = useFullscreenElement()
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={fullscreen ?? undefined}>
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}

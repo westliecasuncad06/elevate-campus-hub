@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useFullscreenElement } from "@/lib/use-fullscreen-element"
 import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "cn"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
@@ -69,8 +70,9 @@ function SelectContent({
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   >) {
+  const fullscreen = useFullscreenElement()
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={fullscreen ?? undefined}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
