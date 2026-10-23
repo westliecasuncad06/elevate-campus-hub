@@ -63,8 +63,9 @@ export function HistoryList({
                           {showFacilitator ? <span className="font-normal text-muted-foreground"> · {batch.facilitatorName}</span> : null}
                         </p>
                         <p className="text-sm text-muted-foreground tabular-nums">
-                          {formatTime(batch.startedAt, timezone)} – {formatTime(batch.finishedAt, timezone)}
-                          {duration ? ` · ${duration}` : ""}
+                          {batch.status === "open"
+                            ? `Started ${formatTime(batch.startedAt, timezone)} · the day ended before it was finished`
+                            : `${formatTime(batch.startedAt, timezone)} – ${formatTime(batch.finishedAt, timezone)}${duration ? ` · ${duration}` : ""}`}
                         </p>
                       </div>
                       <dl className="flex flex-wrap gap-x-5 gap-y-1 text-sm">

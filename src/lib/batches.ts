@@ -33,6 +33,12 @@ const SELECT = `
 export interface BatchFilter {
   facilitatorId?: string;
   status?: "open" | "finished";
+  /**
+   * History: finished batches PLUS batches left open whose day is over (before this YYYY-MM-DD, normally today). A
+   * batch nobody pressed "Finish" on still happened, with students who were engaged, so it belongs in the history.
+   * Overrides `status`.
+   */
+  endedBefore?: string;
   /** Inclusive YYYY-MM-DD bounds on the batch's date. */
   from?: string;
   to?: string;
@@ -49,7 +55,11 @@ export async function loadBatches(supabase: SupabaseClient, filter: BatchFilter 
     .limit(filter.limit ?? 100);
 
   if (filter.facilitatorId) query = query.eq("facilitator_id", filter.facilitatorId);
-  if (filter.status) query = query.eq("status", filter.status);
+  if (filter.endedBefore && /^\d{4}-\d{2}-\d{2}$/.test(filter.endedBefore)) {
+    query = query.or(`status.eq.finished,and(status.eq.open,batch_date.lt.${filter.endedBefore})`);
+  } else if (filter.status) {
+    query = query.eq("status", filter.status);
+  }
   if (filter.from) query = query.gte("batch_date", filter.from);
   if (filter.to) query = query.lte("batch_date", filter.to);
 

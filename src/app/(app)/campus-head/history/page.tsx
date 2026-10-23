@@ -35,7 +35,7 @@ export default async function CampusHeadHistoryPage({ searchParams }: PageProps<
 
   const supabase = await createClient();
   const [batches, { data: people }] = await Promise.all([
-    loadBatches(supabase, { facilitatorId: facilitator, status: "finished", from, to, limit: 150 }),
+    loadBatches(supabase, { facilitatorId: facilitator, endedBefore: today, status: "finished", from, to, limit: 150 }),
     // Facilitators and Campus Heads can both run batches.
     supabase.from("profiles").select("id, first_name, last_name, role").in("role", ["facilitator", "campus_head"]).order("first_name"),
   ]);

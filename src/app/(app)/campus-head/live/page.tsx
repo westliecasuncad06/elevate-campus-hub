@@ -32,10 +32,10 @@ export default async function LivePage() {
   const today = todayInTimezone(timezone);
 
   const supabase = await createClient();
-  const [open, history, { data: people }] = await Promise.all([
+  const [openBatches, history, { data: people }] = await Promise.all([
     loadBatches(supabase, { status: "open", limit: 100 }),
-    // Finished batches of the last 30 days: once they are done they move into the History section below.
-    loadBatches(supabase, { status: "finished", from: daysAgo(today, 30), to: today, limit: 300 }),
+    // Batches that are over (finished, or left open when their day ended) in the last 30 days: they live in the History section below.
+    loadBatches(supabase, { endedBefore: today, status: "finished", from: daysAgo(today, 30), to: today, limit: 300 }),
     supabase
       .from("profiles")
       .select("id, first_name, last_name, role")
@@ -43,6 +43,9 @@ export default async function LivePage() {
       .eq("is_active", true)
       .order("first_name"),
   ]);
+
+  // Only today's open batches are "live"; one left open from an earlier day is over and is shown in History instead.
+  const open = openBatches.filter((b) => b.date >= today);
 
   // Students who checked in today (kiosk, QR, ...) but haven't been added to any facilitator's batch yet.
   const { data: todayLogs } = await supabase

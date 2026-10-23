@@ -32,7 +32,7 @@ export default async function FacilitatorHistoryPage({ searchParams }: PageProps
   const to = pick("to", today);
 
   const supabase = await createClient();
-  const batches = await loadBatches(supabase, { facilitatorId: profile.id, status: "finished", from, to, limit: 100 });
+  const batches = await loadBatches(supabase, { facilitatorId: profile.id, endedBefore: today, status: "finished", from, to, limit: 100 });
 
   return (
     <>
