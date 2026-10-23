@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { FormSelect, type Option } from "@/components/forms";
 import { EmptyState, StatCard } from "@/components/page-header";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,8 +134,10 @@ export function AttendanceSheet({
   const [sort, setSort] = useState<SortKey>("name");
   // "dates": a tile per day the campus met (newest first) and who came that day. "table": the full grid.
   const [view, setView] = useState<"dates" | "table">("dates");
-  // The newest day is selected to begin with (sessions are oldest first).
-  const [selected, setSelected] = useState(Math.max(0, sessions.length - 1));
+  // The day whose attendees are open in the pop-up (an index into `sessions`), or null when it is closed.
+  const [selected, setSelected] = useState<number | null>(null);
+  // Kept after closing so the pop-up's content doesn't vanish while it fades out.
+  const [lastSelected, setLastSelected] = useState(Math.max(0, sessions.length - 1));
 
   // Whatever courses the students have: program codes at a campus with a list, typed courses at one without.
   const courses = useMemo<Option[]>(() => {
@@ -176,7 +179,8 @@ export function AttendanceSheet({
     () => sessions.map((_, i) => rows.filter((r) => r.cells[i] === "attended").length),
     [sessions, rows],
   );
-  const attendees = useMemo(() => visible.filter((r) => r.cells[selected] === "attended"), [visible, selected]);
+  const shown = selected ?? lastSelected;
+  const attendees = useMemo(() => visible.filter((r) => r.cells[shown] === "attended"), [visible, shown]);
 
   if (sessions.length === 0) {
     return (
@@ -295,46 +299,30 @@ export function AttendanceSheet({
 
       {view === "dates" ? (
         <section aria-label="Attendance by date">
-          <div role="tablist" aria-label="Dates" className="-mx-1 mb-5 flex gap-3 overflow-x-auto px-1 pt-3 pb-3">
+          <div className="-mx-1 mb-5 flex gap-3 overflow-x-auto px-1 pt-3 pb-3">
             {order.map((i, position) => {
               const d = dates[i];
-              const active = i === selected;
               const [month, day] = d.short.split(" ");
               return (
                 <button
                   key={sessions[i]}
                   type="button"
-                  role="tab"
-                  aria-selected={active}
-                  title={d.full}
-                  onClick={() => setSelected(i)}
-                  className={cn(
-                    "relative flex w-28 shrink-0 flex-col items-center rounded-2xl border px-3 py-3 text-center transition-all",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground shadow-md"
-                      : "bg-card hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-sm",
-                  )}
+                  aria-haspopup="dialog"
+                  title={`${d.full}: see who attended`}
+                  onClick={() => {
+                    setSelected(i);
+                    setLastSelected(i);
+                  }}
+                  className="relative flex w-28 shrink-0 cursor-pointer flex-col items-center rounded-2xl border bg-card px-3 py-3 text-center transition-all outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   {position === 0 ? (
-                    <span
-                      className={cn(
-                        "absolute -top-2.5 rounded-full px-2 py-0.5 text-[0.65rem] font-bold tracking-wide uppercase",
-                        active ? "bg-background text-foreground" : "bg-brand/25 text-brand-ink",
-                      )}
-                    >
+                    <span className="absolute -top-2.5 rounded-full bg-brand/25 px-2 py-0.5 text-[0.65rem] font-bold tracking-wide text-brand-ink uppercase">
                       Latest
                     </span>
                   ) : null}
-                  <span
-                    className={cn(
-                      "text-xs font-semibold tracking-wide uppercase",
-                      active ? "opacity-90" : "text-muted-foreground",
-                    )}
-                  >
-                    {d.weekday}
-                  </span>
+                  <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{d.weekday}</span>
                   <span className="text-4xl leading-tight font-bold tabular-nums">{day}</span>
-                  <span className={cn("text-sm font-medium", active ? "opacity-90" : "text-muted-foreground")}>{month}</span>
+                  <span className="text-sm font-medium text-muted-foreground">{month}</span>
                   <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold tabular-nums">
                     <UsersIcon className="size-3.5" />
                     {attendedCount[i]}
@@ -344,51 +332,59 @@ export function AttendanceSheet({
             })}
           </div>
 
-          <h2 className="mb-3 text-lg font-semibold">
-            {dates[selected].full}
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {attendees.length} {attendees.length === 1 ? "student" : "students"} attended
-              {filtering ? " (matching your filters)" : ""}
-            </span>
-          </h2>
-          {attendees.length === 0 ? (
-            <EmptyState
-              title={filtering ? "No one matches your filters on this day" : "No one was recorded on this day"}
-              hint={filtering ? "Clear a filter or change the search to see more." : undefined}
-            />
-          ) : (
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {attendees.map((r) => (
-                <li key={r.id} className="rounded-xl border bg-card px-4 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium">{r.name}</p>
-                    <Badge
-                      variant="outline"
-                      className={cn("shrink-0 border-transparent", STATUS_STYLE[r.status])}
-                      title={STATUS_HINT[r.status]}
-                    >
-                      {STATUS_LABEL[r.status]}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearCourse(r.yearLevel, r.course) || "—"}
-                    {" · "}
-                    {r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "—"}
-                    {r.facilitator ? ` · ${r.facilitator}` : ""}
-                  </p>
-                  {r.rosterOnly ? (
-                    <Badge
-                      variant="outline"
-                      className="mt-1 border-transparent bg-brand/25 text-brand-ink"
-                      title="On the roster, but has not registered yet."
-                    >
-                      No account yet
-                    </Badge>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
+          <p className="text-sm text-muted-foreground">Click a date to see the students who attended.</p>
+
+          <Dialog open={selected !== null} onOpenChange={(open) => (open ? null : setSelected(null))}>
+            <DialogContent className="max-h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl">
+              <DialogHeader>
+                <DialogTitle className="text-xl">{dates[shown].full}</DialogTitle>
+                <DialogDescription>
+                  {attendees.length} {attendees.length === 1 ? "student" : "students"} attended
+                  {filtering ? " (matching your filters)" : ""}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="-mr-2 overflow-y-auto pr-2">
+                {attendees.length === 0 ? (
+                  <EmptyState
+                    title={filtering ? "No one matches your filters on this day" : "No one was recorded on this day"}
+                    hint={filtering ? "Clear a filter or change the search to see more." : undefined}
+                  />
+                ) : (
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {attendees.map((r) => (
+                      <li key={r.id} className="rounded-xl border bg-card px-4 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium">{r.name}</p>
+                          <Badge
+                            variant="outline"
+                            className={cn("shrink-0 border-transparent", STATUS_STYLE[r.status])}
+                            title={STATUS_HINT[r.status]}
+                          >
+                            {STATUS_LABEL[r.status]}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {yearCourse(r.yearLevel, r.course) || "—"}
+                          {" · "}
+                          {r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "—"}
+                          {r.facilitator ? ` · ${r.facilitator}` : ""}
+                        </p>
+                        {r.rosterOnly ? (
+                          <Badge
+                            variant="outline"
+                            className="mt-1 border-transparent bg-brand/25 text-brand-ink"
+                            title="On the roster, but has not registered yet."
+                          >
+                            No account yet
+                          </Badge>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </section>
       ) : (
         <>
