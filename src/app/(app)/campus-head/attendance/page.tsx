@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { AttendanceSheet } from "@/components/attendance/attendance-sheet";
-import { Field, SubmitButton, type Option } from "@/components/forms";
+import { ElevateLoader } from "@/components/elevate-loader";
+import type { Option } from "@/components/forms";
+import { RangeForm } from "@/components/attendance/range-form";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { getCampus, requireRole } from "@/lib/auth";
@@ -46,17 +49,6 @@ export default async function AttendanceSheetPage({ searchParams }: PageProps<"/
   const tooLong = (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > MAX_DAYS;
   if (tooLong) from = shiftDays(to, -(MAX_DAYS - 1));
 
-  const supabase = await createClient();
-  const [{ sessions, rows }, { data: facilitatorRows }] = await Promise.all([
-    loadAttendanceSheet(supabase, campus, from, to),
-    supabase.from("profiles").select("id, first_name, last_name").in("role", ["facilitator", "campus_head"]).eq("is_active", true).order("first_name"),
-  ]);
-
-  const facilitators: Option[] = (facilitatorRows ?? []).map((p) => ({
-    value: p.id as string,
-    label: `${p.first_name} ${p.last_name}`.trim(),
-  }));
-
   return (
     <>
       <PageHeader
@@ -65,11 +57,7 @@ export default async function AttendanceSheetPage({ searchParams }: PageProps<"/
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <form method="get" className="flex flex-wrap items-end gap-2">
-          <Field label="From" name="from" type="date" defaultValue={from} max={to} required />
-          <Field label="To" name="to" type="date" defaultValue={to} max={today} required />
-          <SubmitButton variant="secondary">Show</SubmitButton>
-        </form>
+        <RangeForm from={from} to={to} today={today} />
         <div className="flex flex-wrap gap-2">
           {PRESETS.map((p) => {
             const active = to === today && from === shiftDays(today, -(p.days - 1));
@@ -99,15 +87,55 @@ export default async function AttendanceSheetPage({ searchParams }: PageProps<"/
         </p>
       ) : null}
 
-      <AttendanceSheet
+      {/* Changing the range shows the loading animation here only; the menu, header and dates stay where they are. */}
+      <Suspense
         key={`${from}-${to}`}
-        sessions={sessions}
-        rows={rows}
-        facilitators={facilitators}
-        campusCode={campus.code}
-        from={from}
-        to={to}
-      />
+        fallback={
+          <div className="grid min-h-[28rem] place-items-center rounded-xl border bg-card px-4 py-10">
+            <ElevateLoader label="Loading attendance" />
+          </div>
+        }
+      >
+        <SheetData campus={campus} from={from} to={to} />
+      </Suspense>
     </>
+  );
+}
+
+async function SheetData({
+  campus,
+  from,
+  to,
+}: {
+  campus: { id: string; code: string; timezone: string };
+  from: string;
+  to: string;
+}) {
+  const supabase = await createClient();
+  const [{ sessions, rows }, { data: facilitatorRows }] = await Promise.all([
+    loadAttendanceSheet(supabase, campus, from, to),
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("role", ["facilitator", "campus_head"])
+      .eq("is_active", true)
+      .order("first_name"),
+  ]);
+
+  const facilitators: Option[] = (facilitatorRows ?? []).map((p) => ({
+    value: p.id as string,
+    label: `${p.first_name} ${p.last_name}`.trim(),
+  }));
+
+  return (
+    <AttendanceSheet
+      key={`${from}-${to}`}
+      sessions={sessions}
+      rows={rows}
+      facilitators={facilitators}
+      campusCode={campus.code}
+      from={from}
+      to={to}
+    />
   );
 }
