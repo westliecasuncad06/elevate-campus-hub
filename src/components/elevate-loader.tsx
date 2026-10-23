@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The kiosk's loading animation: the Elevate mark is drawn in red, filled, and lifts, while soft rings ripple out
- * behind it. Used while the kiosk opens and while a check-in or a new account is being saved.
+ * The app's loading animation: the Elevate mark is drawn in red, filled, and lifts, while soft rings ripple out behind
+ * it. Shown when a page is opened or refreshed, while signing in, and while the kiosk saves a check-in.
  */
-export function KioskLoader({ label, className }: { label: string; className?: string }) {
+export function ElevateLoader({ label, className }: { label: string; className?: string }) {
   return (
     <div role="status" aria-live="polite" className={cn("flex flex-col items-center justify-center text-center", className)}>
       <div className="relative grid size-44 place-items-center">
@@ -37,6 +37,15 @@ export function KioskLoader({ label, className }: { label: string; className?: s
           ))}
         </span>
       </p>
+    </div>
+  );
+}
+
+/** The loader over the whole screen, on a soft blurred backdrop (what's underneath, like a typed form, stays as it was). */
+export function LoadingOverlay({ label }: { label: string }) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/90 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <ElevateLoader label={label} />
     </div>
   );
 }

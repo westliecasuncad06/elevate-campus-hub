@@ -2,6 +2,7 @@
 
 import { Loader2Icon } from "lucide-react";
 import { useFormStatus } from "react-dom";
+import { LoadingOverlay } from "@/components/elevate-loader";
 import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "./actions";
 
@@ -32,10 +33,13 @@ function GoogleMark() {
 function Inner() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="outline" size="lg" className="w-full" disabled={pending}>
+    <>
+      {pending ? <LoadingOverlay label="Opening Google" /> : null}
+      <Button type="submit" variant="outline" size="lg" className="w-full" disabled={pending}>
       {pending ? <Loader2Icon className="animate-spin" /> : <GoogleMark />}
       {pending ? "Opening Google…" : "Continue with Google"}
-    </Button>
+      </Button>
+    </>
   );
 }
 

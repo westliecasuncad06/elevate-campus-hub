@@ -1,6 +1,7 @@
 "use client";
 
 import { Honeypot, Turnstile } from "@/components/bot-guard";
+import { LoadingOverlay } from "@/components/elevate-loader";
 import { Field, FormMessage, SubmitButton } from "@/components/forms";
 import { useFormAction } from "@/components/use-form-action";
 import { signIn } from "./actions";
@@ -10,6 +11,7 @@ export function LoginForm({ next }: { next?: string }) {
 
   return (
     <form {...formProps} className="relative grid gap-4">
+      {pending ? <LoadingOverlay label="Signing you in" /> : null}
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <Honeypot />
       <Field label="Email" name="email" type="email" autoComplete="email" maxLength={254} required autoFocus />

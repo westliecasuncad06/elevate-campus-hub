@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingOverlay } from "@/components/elevate-loader";
 import { Field, FormMessage, SubmitButton } from "@/components/forms";
 import { useFormAction } from "@/components/use-form-action";
 import { verifyTwoStepAction } from "./actions";
@@ -9,6 +10,7 @@ export function VerifyForm({ next }: { next?: string }) {
 
   return (
     <form {...formProps} className="grid gap-4">
+      {pending ? <LoadingOverlay label="Signing you in" /> : null}
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field
         label="6-digit code"

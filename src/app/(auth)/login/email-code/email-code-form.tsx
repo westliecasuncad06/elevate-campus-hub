@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Field, FormMessage, SubmitButton } from "@/components/forms";
 import { Button } from "@/components/ui/button";
+import { LoadingOverlay } from "@/components/elevate-loader";
 import { useFormAction } from "@/components/use-form-action";
 import type { ActionResult } from "@/lib/types";
 import { sendEmailCodeAction, verifyEmailCodeAction } from "./actions";
@@ -52,6 +53,7 @@ export function EmailCodeForm({
     <div className="grid gap-5">
       {sent ? (
         <form {...formProps} className="grid gap-4">
+          {pending ? <LoadingOverlay label="Signing you in" /> : null}
           {next ? <input type="hidden" name="next" value={next} /> : null}
           <Field
             label="6-digit code"

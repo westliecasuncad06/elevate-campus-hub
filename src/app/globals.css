@@ -236,3 +236,15 @@
     fill-opacity: 1;
   }
 }
+
+/* Safety net: if the splash's script never runs, it still gets out of the way. */
+@keyframes elevate-splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+.elevate-splash {
+  animation: elevate-splash-out 0.4s ease 8s forwards;
+}

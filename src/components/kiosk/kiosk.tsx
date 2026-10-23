@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2Icon, MaximizeIcon, MinimizeIcon, UserPlusIcon } from "lucide-react";
 import { AccountFields } from "@/components/accounts/account-fields";
+import { LoadingOverlay } from "@/components/elevate-loader";
 import { Field, FormMessage, SubmitButton } from "@/components/forms";
 import { StudentNumberField } from "@/components/student-number-field";
 import { Button } from "@/components/ui/button";
 import { useFormAction } from "@/components/use-form-action";
-import { KioskLoader } from "./kiosk-loader";
 import { kioskCheckInAction, kioskRegisterAction, type KioskKind, type KioskOutcome } from "@/app/actions/kiosk";
 import { cn } from "@/lib/utils";
 import type { Program } from "@/lib/types";
@@ -74,11 +74,7 @@ export function Kiosk({ programs, campusName }: { programs: Program[]; campusNam
         {fullscreen ? "Exit full screen" : "Full screen"}
       </Button>
 
-      {busy ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/90 px-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <KioskLoader label={busy} />
-        </div>
-      ) : null}
+      {busy ? <LoadingOverlay label={busy} /> : null}
 
       <div className="mx-auto w-full max-w-2xl pt-8">
         <p className="text-center text-lg font-medium text-muted-foreground">{campusName}</p>
