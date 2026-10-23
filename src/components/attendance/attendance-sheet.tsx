@@ -1,7 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckIcon, DownloadIcon, MinusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import {
+  CalendarDaysIcon,
+  CheckIcon,
+  DownloadIcon,
+  MinusIcon,
+  TableIcon,
+  TriangleAlertIcon,
+  UsersIcon,
+  XIcon,
+} from "lucide-react";
 import { FormSelect, type Option } from "@/components/forms";
 import { EmptyState, StatCard } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -63,18 +72,30 @@ const CELL: Record<CellState, { label: string; className: string; icon: React.Re
 const LEGEND: { state: CellState; label: string }[] = [
   { state: "attended", label: "Attended" },
   { state: "missed", label: "Not attended" },
-  { state: "before", label: "Not counted (before they registered, or today and not recorded yet)" },
+  {
+    state: "before",
+    label: "Not counted (before they registered, or today and not recorded yet)",
+  },
 ];
 
 /** "Oct 16" for a YYYY-MM-DD day. */
-function shortDate(day: string): { short: string; weekday: string; full: string } {
+function shortDate(day: string): {
+  short: string;
+  weekday: string;
+  full: string;
+} {
   const [y, m, d] = day.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   const fmt = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(date);
   return {
     short: fmt({ month: "short", day: "numeric" }),
     weekday: fmt({ weekday: "short" }),
-    full: fmt({ weekday: "long", month: "long", day: "numeric", year: "numeric" }),
+    full: fmt({
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }),
   };
 }
 
@@ -110,6 +131,10 @@ export function AttendanceSheet({
   const [facilitator, setFacilitator] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [sort, setSort] = useState<SortKey>("name");
+  // "dates": a tile per day the campus met (newest first) and who came that day. "table": the full grid.
+  const [view, setView] = useState<"dates" | "table">("dates");
+  // The newest day is selected to begin with (sessions are oldest first).
+  const [selected, setSelected] = useState(Math.max(0, sessions.length - 1));
 
   // Whatever courses the students have: program codes at a campus with a list, typed courses at one without.
   const courses = useMemo<Option[]>(() => {
@@ -130,7 +155,8 @@ export function AttendanceSheet({
       if (needle && !r.name.toLowerCase().includes(needle)) return false;
       if (program !== ALL && r.course !== program) return false;
       if (year !== ALL && String(r.yearLevel) !== year) return false;
-      if (facilitator === "none" ? r.facilitatorId !== null : facilitator !== ALL && r.facilitatorId !== facilitator) return false;
+      if (facilitator === "none" ? r.facilitatorId !== null : facilitator !== ALL && r.facilitatorId !== facilitator)
+        return false;
       if (status === "at-risk") return r.atRisk;
       if (status === "roster") return r.rosterOnly === true;
       if (status !== ALL && r.status !== status) return false;
@@ -143,6 +169,14 @@ export function AttendanceSheet({
   const filtering = query !== "" || program !== ALL || year !== ALL || facilitator !== ALL || status !== ALL;
 
   const dates = useMemo(() => sessions.map(shortDate), [sessions]);
+  // Most recent first, in the tiles and in the table's columns.
+  const order = useMemo(() => sessions.map((_, i) => i).reverse(), [sessions]);
+  // How many students came on each day (the whole campus, whatever the filters say).
+  const attendedCount = useMemo(
+    () => sessions.map((_, i) => rows.filter((r) => r.cells[i] === "attended").length),
+    [sessions, rows],
+  );
+  const attendees = useMemo(() => visible.filter((r) => r.cells[selected] === "attended"), [visible, selected]);
 
   if (sessions.length === 0) {
     return (
@@ -156,9 +190,17 @@ export function AttendanceSheet({
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Students" value={summary.students} hint={filtering ? "Matching your filters" : "Registered, plus names on your roster"} />
+        <StatCard
+          label="Students"
+          value={summary.students}
+          hint={filtering ? "Matching your filters" : "Registered, plus names on your roster"}
+        />
         <StatCard label="Sessions" value={summary.sessions} hint="Days the campus met" />
-        <StatCard label="Average attendance" value={summary.averageRate === null ? "—" : `${summary.averageRate}%`} hint="Of the sessions each student could attend" />
+        <StatCard
+          label="Average attendance"
+          value={summary.averageRate === null ? "—" : `${summary.averageRate}%`}
+          hint="Of the sessions each student could attend"
+        />
         <StatCard label="Consistent" value={summary.consistent} hint="Attended 80% or more" />
         <StatCard label="At risk" value={summary.atRisk} hint={`Missed the last ${AT_RISK_STREAK}+ in a row`} />
       </div>
@@ -193,7 +235,10 @@ export function AttendanceSheet({
             { value: ALL, label: "Everyone" },
             { value: "at-risk", label: "At risk" },
             { value: "roster", label: "No account yet" },
-            ...(["consistent", "regular", "occasional", "rare", "new"] as const).map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+            ...(["consistent", "regular", "occasional", "rare", "new"] as const).map((s) => ({
+              value: s,
+              label: STATUS_LABEL[s],
+            })),
           ]}
           onValueChange={setStatus}
           className="w-40"
@@ -202,7 +247,10 @@ export function AttendanceSheet({
           label="Sort by"
           name="sort"
           defaultValue="name"
-          options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: SORT_LABEL[k] }))}
+          options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({
+            value: k,
+            label: SORT_LABEL[k],
+          }))}
           onValueChange={(v) => setSort(v as SortKey)}
           className="w-52"
         />
@@ -217,103 +265,240 @@ export function AttendanceSheet({
         </Button>
       </div>
 
-      <p className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
-        {LEGEND.map(({ state, label }) => (
-          <span key={state} className="inline-flex items-center gap-1.5">
-            <span className={cn("grid size-5 place-items-center rounded-md", CELL[state].className)}>{CELL[state].icon}</span>
-            {label}
-          </span>
+      <div
+        role="tablist"
+        aria-label="How to see the attendance"
+        className="mb-4 grid w-full max-w-xs grid-cols-2 gap-1 rounded-2xl bg-muted p-1"
+      >
+        {(
+          [
+            { id: "dates", label: "Dates", icon: CalendarDaysIcon },
+            { id: "table", label: "Table", icon: TableIcon },
+          ] as const
+        ).map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            aria-selected={view === v.id}
+            onClick={() => setView(v.id)}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors",
+              view === v.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <v.icon className="size-4" />
+            {v.label}
+          </button>
         ))}
-        <span>Only days when at least one student was recorded count as sessions.</span>
-      </p>
+      </div>
 
-      {visible.length === 0 ? (
-        <EmptyState title="No students match" hint="Clear a filter or change the search to see more." />
-      ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 z-10 min-w-48 bg-card">Student</TableHead>
-                <TableHead className="hidden whitespace-nowrap sm:table-cell">Year / Course</TableHead>
-                {dates.map((d, i) => (
-                  <TableHead key={sessions[i]} className="px-1 text-center" title={d.full}>
-                    <span className="block whitespace-nowrap text-xs font-medium">{d.short}</span>
-                    <span className="block text-[0.65rem] font-normal text-muted-foreground">{d.weekday}</span>
-                  </TableHead>
-                ))}
-                <TableHead className="whitespace-nowrap text-right">Attended</TableHead>
-                <TableHead className="min-w-28 whitespace-nowrap">Rate</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="whitespace-nowrap">Last attended</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visible.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="sticky left-0 z-10 bg-card">
-                    <p className="font-medium">{r.name}</p>
-                    {r.rosterOnly ? (
-                      <Badge variant="outline" className="mt-0.5 border-transparent bg-brand/25 text-brand-ink" title="On the roster, but hasn't registered yet. Their attendance comes from your own sheet and moves to their account when they register.">
-                        No account yet
-                      </Badge>
-                    ) : null}
-                    <p className="text-xs text-muted-foreground">
-                      {r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "—"}
-                      {r.facilitator ? ` · ${r.facilitator}` : ""}
-                    </p>
-                    {/* Phones: the Year / Course column is hidden to leave room for the dates, so it goes here. */}
-                    <p className="text-xs text-muted-foreground sm:hidden">{yearCourse(r.yearLevel, r.course) || "—"}</p>
-                    {r.atRisk ? (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-destructive">
-                        <TriangleAlertIcon className="size-3.5" />
-                        Missed the last {r.missedStreak}
-                      </p>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
-                    {yearCourse(r.yearLevel, r.course) || "—"}
-                  </TableCell>
-                  {r.cells.map((cell, i) => (
-                    <TableCell key={sessions[i]} className="px-1 text-center">
-                      <span
-                        role="img"
-                        aria-label={`${dates[i].full}: ${CELL[cell].label}`}
-                        title={`${dates[i].full}: ${CELL[cell].label}`}
-                        className={cn("mx-auto grid size-6 place-items-center rounded-md", CELL[cell].className)}
-                      >
-                        {CELL[cell].icon}
-                      </span>
-                    </TableCell>
-                  ))}
-                  <TableCell className="whitespace-nowrap text-right tabular-nums">
-                    {r.attended}/{r.eligible}
-                  </TableCell>
-                  <TableCell>
-                    {r.rate === null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-14 overflow-hidden rounded-full bg-muted" aria-hidden>
-                          <div className="h-full rounded-full bg-foreground" style={{ width: `${r.rate}%` }} />
-                        </div>
-                        <span className="w-9 text-right tabular-nums">{r.rate}%</span>
-                      </div>
+      {view === "dates" ? (
+        <section aria-label="Attendance by date">
+          <div role="tablist" aria-label="Dates" className="-mx-1 mb-5 flex gap-3 overflow-x-auto px-1 pt-3 pb-3">
+            {order.map((i, position) => {
+              const d = dates[i];
+              const active = i === selected;
+              const [month, day] = d.short.split(" ");
+              return (
+                <button
+                  key={sessions[i]}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  title={d.full}
+                  onClick={() => setSelected(i)}
+                  className={cn(
+                    "relative flex w-28 shrink-0 flex-col items-center rounded-2xl border px-3 py-3 text-center transition-all",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground shadow-md"
+                      : "bg-card hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-sm",
+                  )}
+                >
+                  {position === 0 ? (
+                    <span
+                      className={cn(
+                        "absolute -top-2.5 rounded-full px-2 py-0.5 text-[0.65rem] font-bold tracking-wide uppercase",
+                        active ? "bg-background text-foreground" : "bg-brand/25 text-brand-ink",
+                      )}
+                    >
+                      Latest
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      "text-xs font-semibold tracking-wide uppercase",
+                      active ? "opacity-90" : "text-muted-foreground",
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn("border-transparent", STATUS_STYLE[r.status])} title={STATUS_HINT[r.status]}>
+                  >
+                    {d.weekday}
+                  </span>
+                  <span className="text-4xl leading-tight font-bold tabular-nums">{day}</span>
+                  <span className={cn("text-sm font-medium", active ? "opacity-90" : "text-muted-foreground")}>{month}</span>
+                  <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold tabular-nums">
+                    <UsersIcon className="size-3.5" />
+                    {attendedCount[i]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <h2 className="mb-3 text-lg font-semibold">
+            {dates[selected].full}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {attendees.length} {attendees.length === 1 ? "student" : "students"} attended
+              {filtering ? " (matching your filters)" : ""}
+            </span>
+          </h2>
+          {attendees.length === 0 ? (
+            <EmptyState
+              title={filtering ? "No one matches your filters on this day" : "No one was recorded on this day"}
+              hint={filtering ? "Clear a filter or change the search to see more." : undefined}
+            />
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {attendees.map((r) => (
+                <li key={r.id} className="rounded-xl border bg-card px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium">{r.name}</p>
+                    <Badge
+                      variant="outline"
+                      className={cn("shrink-0 border-transparent", STATUS_STYLE[r.status])}
+                      title={STATUS_HINT[r.status]}
+                    >
                       {STATUS_LABEL[r.status]}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {r.lastAttended ? shortDate(r.lastAttended).short : "Never"}
-                  </TableCell>
-                </TableRow>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearCourse(r.yearLevel, r.course) || "—"}
+                    {" · "}
+                    {r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "—"}
+                    {r.facilitator ? ` · ${r.facilitator}` : ""}
+                  </p>
+                  {r.rosterOnly ? (
+                    <Badge
+                      variant="outline"
+                      className="mt-1 border-transparent bg-brand/25 text-brand-ink"
+                      title="On the roster, but has not registered yet."
+                    >
+                      No account yet
+                    </Badge>
+                  ) : null}
+                </li>
               ))}
-            </TableBody>
-          </Table>
-        </div>
+            </ul>
+          )}
+        </section>
+      ) : (
+        <>
+          <p className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            {LEGEND.map(({ state, label }) => (
+              <span key={state} className="inline-flex items-center gap-1.5">
+                <span className={cn("grid size-5 place-items-center rounded-md", CELL[state].className)}>{CELL[state].icon}</span>
+                {label}
+              </span>
+            ))}
+            <span>Only days when at least one student was recorded count as sessions.</span>
+          </p>
+
+          {visible.length === 0 ? (
+            <EmptyState title="No students match" hint="Clear a filter or change the search to see more." />
+          ) : (
+            <div className="overflow-x-auto rounded-xl border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="sticky left-0 z-10 min-w-48 bg-card">Student</TableHead>
+                    <TableHead className="hidden whitespace-nowrap sm:table-cell">Year / Course</TableHead>
+                    {order.map((i) => (
+                      <TableHead key={sessions[i]} className="px-1 text-center" title={dates[i].full}>
+                        <span className="block whitespace-nowrap text-xs font-medium">{dates[i].short}</span>
+                        <span className="block text-[0.65rem] font-normal text-muted-foreground">{dates[i].weekday}</span>
+                      </TableHead>
+                    ))}
+                    <TableHead className="whitespace-nowrap text-right">Attended</TableHead>
+                    <TableHead className="min-w-28 whitespace-nowrap">Rate</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Last attended</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visible.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="sticky left-0 z-10 bg-card">
+                        <p className="font-medium">{r.name}</p>
+                        {r.rosterOnly ? (
+                          <Badge
+                            variant="outline"
+                            className="mt-0.5 border-transparent bg-brand/25 text-brand-ink"
+                            title="On the roster, but hasn't registered yet. Their attendance comes from your own sheet and moves to their account when they register."
+                          >
+                            No account yet
+                          </Badge>
+                        ) : null}
+                        <p className="text-xs text-muted-foreground">
+                          {r.gender === "male" ? "Male" : r.gender === "female" ? "Female" : "—"}
+                          {r.facilitator ? ` · ${r.facilitator}` : ""}
+                        </p>
+                        {/* Phones: the Year / Course column is hidden to leave room for the dates, so it goes here. */}
+                        <p className="text-xs text-muted-foreground sm:hidden">{yearCourse(r.yearLevel, r.course) || "—"}</p>
+                        {r.atRisk ? (
+                          <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-destructive">
+                            <TriangleAlertIcon className="size-3.5" />
+                            Missed the last {r.missedStreak}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
+                        {yearCourse(r.yearLevel, r.course) || "—"}
+                      </TableCell>
+                      {order.map((i) => (
+                        <TableCell key={sessions[i]} className="px-1 text-center">
+                          <span
+                            role="img"
+                            aria-label={`${dates[i].full}: ${CELL[r.cells[i]].label}`}
+                            title={`${dates[i].full}: ${CELL[r.cells[i]].label}`}
+                            className={cn("mx-auto grid size-6 place-items-center rounded-md", CELL[r.cells[i]].className)}
+                          >
+                            {CELL[r.cells[i]].icon}
+                          </span>
+                        </TableCell>
+                      ))}
+                      <TableCell className="whitespace-nowrap text-right tabular-nums">
+                        {r.attended}/{r.eligible}
+                      </TableCell>
+                      <TableCell>
+                        {r.rate === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-14 overflow-hidden rounded-full bg-muted" aria-hidden>
+                              <div className="h-full rounded-full bg-foreground" style={{ width: `${r.rate}%` }} />
+                            </div>
+                            <span className="w-9 text-right tabular-nums">{r.rate}%</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn("border-transparent", STATUS_STYLE[r.status])}
+                          title={STATUS_HINT[r.status]}
+                        >
+                          {STATUS_LABEL[r.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {r.lastAttended ? shortDate(r.lastAttended).short : "Never"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
       )}
 
       <details className="mt-4 text-sm text-muted-foreground">
@@ -325,10 +510,12 @@ export function AttendanceSheet({
             </li>
           ))}
           <li className="list-disc">
-            <strong className="text-foreground">At risk</strong>: came before, but missed the last {AT_RISK_STREAK} or more sessions in a row.
+            <strong className="text-foreground">At risk</strong>: came before, but missed the last {AT_RISK_STREAK} or more
+            sessions in a row.
           </li>
           <li className="list-disc">
-            A student is only counted against sessions held after they were registered, so new students aren’t marked absent for earlier weeks.
+            A student is only counted against sessions held after they were registered, so new students aren’t marked absent for
+            earlier weeks.
           </li>
         </ul>
       </details>
