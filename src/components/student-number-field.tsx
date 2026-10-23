@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Field } from "@/components/forms";
 import { formatStudentNumberInput, STUDENT_NUMBER_HINT } from "@/lib/student-number";
 
-/** The student number box: type the digits and the dashes (2017-05-07107) appear by themselves. */
+/** The student number box: type the digits and the dashes (2026-02-07107) appear by themselves. */
 export function StudentNumberField({
   label = "Student number",
   name = "student_number",
@@ -32,7 +32,7 @@ export function StudentNumberField({
       readOnly={readOnly}
       inputMode="numeric"
       autoComplete="off"
-      placeholder="2017-05-07107"
+      placeholder="2026-02-07107"
       maxLength={13}
       required
       autoFocus={autoFocus}

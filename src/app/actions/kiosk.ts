@@ -54,7 +54,7 @@ export async function kioskCheckInAction(kind: KioskKind, raw: string): Promise<
   if (!value) {
     return {
       ok: false,
-      error: kind === "student_number" ? "Type your full student number, like 2017-05-07107." : "Type your full phone number.",
+      error: kind === "student_number" ? "Type your full student number, like 2026-02-07107." : "Type your full phone number.",
     };
   }
   // Someone guessing numbers at the kiosk would show up here as a flood of tries.

@@ -81,9 +81,9 @@ export function parseAccountForm(role: Role, formData: FormData, today: string, 
   let yearLevel: number | null = null;
   let studentNumber: string | null = null;
   if (role === "student") {
-    // The student number is how students check in at the kiosk, so it is required and always stored dashed (2017-05-07107).
+    // The student number is how students check in at the kiosk, so it is required and always stored dashed (2026-02-07107).
     studentNumber = parseStudentNumber(text(formData, "student_number"));
-    if (!studentNumber) return { ok: false, error: "Enter the full student number, like 2017-05-07107." };
+    if (!studentNumber) return { ok: false, error: "Enter the full student number, like 2026-02-07107." };
     if (!birthday) return { ok: false, error: "Birthday is required for students." };
     if (courseMode === "program") {
       programId = optional(formData, "program_id");

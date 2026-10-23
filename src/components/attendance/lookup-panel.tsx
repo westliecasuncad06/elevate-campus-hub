@@ -65,7 +65,7 @@ export function LookupPanel({
               const v = e.target.value;
               setQuery(/^(19|20)[\d-]*$/.test(v.replace(/\s/g, "")) ? formatStudentNumberInput(v) : v);
             }}
-            placeholder="2017-05-07107"
+            placeholder="2026-02-07107"
             autoComplete="off"
             autoFocus
           />
