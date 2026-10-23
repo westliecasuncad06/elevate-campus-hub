@@ -116,7 +116,7 @@ export async function setPassword(_prev: ActionResult | null, formData: FormData
     })
     .eq("id", profile.id);
   if (profileError) {
-    const detail = profileError.code === "23505" ? "That phone number is already registered." : "Password saved, but your profile could not be updated. Try again.";
+    const detail = profileError.code === "23505" ? "That phone number or student number is already registered." : "Password saved, but your profile could not be updated. Try again.";
     return { ok: false, error: detail };
   }
 

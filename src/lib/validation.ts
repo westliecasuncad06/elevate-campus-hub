@@ -1,5 +1,5 @@
 import { formatName } from "@/lib/names";
-import { looksLikeEmail, normalizePhone } from "@/lib/phone";
+import { isValidPhone, looksLikeEmail, normalizePhone } from "@/lib/phone";
 import { parseStudentNumber } from "@/lib/student-number";
 import type { Gender, Role } from "@/lib/types";
 
@@ -58,8 +58,8 @@ export function parseAccountForm(role: Role, formData: FormData, today: string, 
   const rawPhone = text(formData, "phone");
   const phone = rawPhone ? normalizePhone(rawPhone) : null;
   if (role === "student" && !phone) return { ok: false, error: "Phone number is required for students." };
-  if (phone && (phone.length < 7 || phone.length > 15)) {
-    return { ok: false, error: "Enter a valid phone number." };
+  if (phone && !isValidPhone(phone)) {
+    return { ok: false, error: "Enter an 11-digit mobile number, like 09171234567." };
   }
 
   const genderRaw = text(formData, "gender");

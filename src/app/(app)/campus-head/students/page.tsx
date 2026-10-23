@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TriangleAlertIcon } from "lucide-react";
 import { AccountDialog } from "@/components/accounts/account-dialog";
+import { InviteStaffDialog } from "@/components/accounts/invite-staff-dialog";
 import { ActiveToggleButton, ReassignFacilitator, ResendInviteButton, ResetTwoStepButton } from "@/components/accounts/row-actions";
 import { AccountStatusBadge, isPending } from "@/components/accounts/status-badge";
 import { LiveFilters, LiveSearch } from "@/components/live-filters";
@@ -73,7 +74,12 @@ export default async function StudentsPage({ searchParams }: PageProps<"/campus-
       <PageHeader
         title="Students"
         description="Everyone registered at your campus. Students are assigned to the facilitator who first takes their attendance."
-        actions={<AccountDialog role="student" programs={programs} label="Add student" />}
+        actions={
+          <>
+            <InviteStaffDialog role="student" />
+            <AccountDialog role="student" programs={programs} label="Add student" />
+          </>
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">

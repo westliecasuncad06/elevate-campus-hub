@@ -10,6 +10,11 @@ export function normalizePhone(input: string): string {
   return digits;
 }
 
+/** A Philippine mobile number as stored: exactly 11 digits, starting with 09 (what normalizePhone returns). */
+export function isValidPhone(normalized: string): boolean {
+  return /^09\d{9}$/.test(normalized);
+}
+
 export function looksLikeEmail(input: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
 }

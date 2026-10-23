@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2Icon, MaximizeIcon, MinimizeIcon, UserPlusIcon } from "lucide-react";
 import { AccountFields } from "@/components/accounts/account-fields";
 import { LoadingOverlay } from "@/components/elevate-loader";
-import { Field, FormMessage, SubmitButton } from "@/components/forms";
+import { FormMessage, SubmitButton } from "@/components/forms";
+import { PhoneField } from "@/components/phone-field";
 import { StudentNumberField } from "@/components/student-number-field";
 import { Button } from "@/components/ui/button";
 import { useFormAction } from "@/components/use-form-action";
@@ -161,7 +162,7 @@ function EntryScreen({
         {kind === "student_number" ? (
           <StudentNumberField label="Your student number" autoFocus />
         ) : (
-          <Field label="Your phone number" name="phone" type="tel" inputMode="tel" placeholder="09XX XXX XXXX" autoComplete="off" autoFocus required />
+          <PhoneField label="Your phone number" autoFocus required />
         )}
         {error ? (
           <p role="alert" className="rounded-lg bg-destructive/10 px-4 py-3 text-base text-destructive">

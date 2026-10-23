@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Field, FormSelect, type Option } from "@/components/forms";
+import { PhoneField } from "@/components/phone-field";
 import { PrivacyConsent } from "@/components/privacy/privacy-consent";
 import { StudentNumberField } from "@/components/student-number-field";
 import { usesProgramList } from "@/lib/course";
@@ -117,17 +118,7 @@ export function AccountFields({
       ) : null}
       <Field label="First name" name="first_name" defaultValue={defaults?.first_name} autoComplete="off" required />
       <Field label="Last name" name="last_name" defaultValue={defaults?.last_name} autoComplete="off" required />
-      <Field
-        label="Phone number"
-        name="phone"
-        type="tel"
-        inputMode="tel"
-        defaultValue={defaults?.phone ?? ""}
-        readOnly={lockedField === "phone"}
-        autoComplete="off"
-        placeholder="09XX XXX XXXX"
-        required={isStudent}
-      />
+      <PhoneField defaultValue={defaults?.phone} readOnly={lockedField === "phone"} required={isStudent} />
       <Field label="Email" name="email" type="email" defaultValue={defaults?.email} autoComplete="off" required />
       {needsGender ? (
         <FormSelect label="Gender" name="gender" options={GENDER_OPTIONS} defaultValue={defaults?.gender ?? undefined} required />

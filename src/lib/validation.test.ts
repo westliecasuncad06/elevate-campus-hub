@@ -38,6 +38,15 @@ describe("parseAccountForm (student)", () => {
     expect(parseAccountForm("student", form({ ...student, year_level: "" }), "2026-03-11").ok).toBe(false);
   });
 
+  it("accepts only an 11-digit mobile number", () => {
+    for (const phone of ["09171234567", "+63 917 123 4567", "9171234567"]) {
+      expect(parseAccountForm("student", form({ ...student, phone }), "2026-03-11").ok).toBe(true);
+    }
+    for (const phone of ["0917123456", "091712345678", "09665113215151532132", "12345678901", "abc"]) {
+      expect(parseAccountForm("student", form({ ...student, phone }), "2026-03-11").ok).toBe(false);
+    }
+  });
+
   it("requires a full student number and stores it dashed", () => {
     expect(parseAccountForm("student", form({ ...student, student_number: "" }), "2026-03-11").ok).toBe(false);
     expect(parseAccountForm("student", form({ ...student, student_number: "2017-05-0710" }), "2026-03-11").ok).toBe(false);

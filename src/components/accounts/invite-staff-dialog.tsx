@@ -8,7 +8,7 @@ import { ROLE_LABEL } from "@/lib/roles";
 import type { Role } from "@/lib/types";
 
 /**
- * "Add facilitator" / "Add campus head" / (Super Admin only) "Invite student by email": just an email. They register
+ * "Add facilitator" / "Add campus head" / "Invite student by email" (Super Admin and Campus Head): just an email. They register
  * themselves with the 6-digit code they are sent.
  */
 export function InviteStaffDialog({ role, campuses }: { role: "campus_head" | "facilitator" | "student"; campuses?: Option[] }) {
@@ -21,7 +21,7 @@ export function InviteStaffDialog({ role, campuses }: { role: "campus_head" | "f
       title={isStudent ? "Invite a student by email" : `Add ${label}`}
       description={
         isStudent
-          ? "Just their email. They get an invitation with a registration code, and fill in their own name, course, year level and other details when they register. If their name is on the campus roster, they are matched to it."
+          ? "Just their email. They get an invitation with a registration code, and fill in their own name, student number, phone, course, year level and other details when they register. If their name is on the campus roster, they are matched to it."
           : "Just their email. They get an invitation with a registration code, and fill in their own name and details when they register."
       }
       submitLabel="Send invitation"

@@ -4,7 +4,7 @@ import { getActor, getCampus } from "@/lib/auth";
 import { createAccount } from "@/lib/accounts";
 import { usesProgramList } from "@/lib/course";
 import { todayInTimezone } from "@/lib/dates";
-import { normalizePhone } from "@/lib/phone";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { getActivePrograms } from "@/lib/queries";
 import { checkRateLimits, rateKey, tooManyMessage } from "@/lib/rate-limit";
 import { parseStudentNumber } from "@/lib/student-number";
@@ -42,7 +42,7 @@ async function recordAttendance(campusId: string, studentId: string, scannedBy: 
 function cleanValue(kind: KioskKind, raw: string): string | null {
   if (kind === "student_number") return parseStudentNumber(raw);
   const phone = normalizePhone(raw);
-  return phone.length >= 7 && phone.length <= 15 ? phone : null;
+  return isValidPhone(phone) ? phone : null;
 }
 
 /** A student typed their student number or phone number at the kiosk. */
@@ -54,7 +54,7 @@ export async function kioskCheckInAction(kind: KioskKind, raw: string): Promise<
   if (!value) {
     return {
       ok: false,
-      error: kind === "student_number" ? "Type your full student number, like 2026-02-07107." : "Type your full phone number.",
+      error: kind === "student_number" ? "Type your full student number, like 2026-02-07107." : "Type your 11-digit phone number, like 09171234567.",
     };
   }
   // Someone guessing numbers at the kiosk would show up here as a flood of tries.

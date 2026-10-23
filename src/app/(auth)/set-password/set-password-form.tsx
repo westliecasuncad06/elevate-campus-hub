@@ -1,6 +1,7 @@
 "use client";
 
 import { Field, FormMessage, FormSelect, SubmitButton } from "@/components/forms";
+import { PhoneField } from "@/components/phone-field";
 import { PrivacyConsent } from "@/components/privacy/privacy-consent";
 import { StudentNumberField } from "@/components/student-number-field";
 import { useFormAction } from "@/components/use-form-action";
@@ -47,15 +48,7 @@ export function SetPasswordForm({
             required={role === "facilitator" || isStudent}
             placeholder="Select"
           />
-          <Field
-            label={isStudent ? "Phone number" : "Phone number (optional)"}
-            name="phone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="09XX XXX XXXX"
-            required={isStudent}
-          />
+          <PhoneField label={isStudent ? "Phone number" : "Phone number (optional)"} required={isStudent} autoComplete="tel" />
           <Field
             label={isStudent ? "Birthday" : "Birthday (optional)"}
             name="birthday"
